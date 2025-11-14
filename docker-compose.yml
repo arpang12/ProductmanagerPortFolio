@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+        VITE_APP_URL: ${VITE_APP_URL}
+    ports:
+      - "3000:80"
+    environment:
+      - NODE_ENV=production
+    env_file:
+      - .env.local
+    networks:
+      - portfolio_network
+    restart: unless-stopped
+
+  # Optional: Redis for caching and rate limiting
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - portfolio_network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # Optional: Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx-proxy.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - app
+    networks:
+      - portfolio_network
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+
+networks:
+  portfolio_network:
+    driver: bridge

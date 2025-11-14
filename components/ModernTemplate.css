@@ -1,0 +1,109 @@
+/* Modern Template Styles */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
+
+.modern-template {
+    font-family: 'Poppins', sans-serif;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    color: #4a4e69;
+    min-height: 100vh;
+}
+
+.modern-template h1, 
+.modern-template h2, 
+.modern-template h3 {
+    color: #9a8c98;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+}
+
+.modern-template .soft-shadow {
+    box-shadow: 0 4px 20px rgba(201, 173, 167, 0.2);
+}
+
+.modern-template .pastel-card {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.modern-template .gradient-text {
+    background: linear-gradient(45deg, #9a8c98, #c9ada7);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* Custom scrollbar for modern template */
+.modern-template::-webkit-scrollbar {
+    width: 10px;
+}
+
+.modern-template::-webkit-scrollbar-track {
+    background: #f8f9fa;
+    border-radius: 10px;
+}
+
+.modern-template::-webkit-scrollbar-thumb {
+    background: linear-gradient(#c9ada7, #9a8c98);
+    border-radius: 10px;
+}
+
+.modern-template::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(#b8a29c, #8a7c88);
+}
+
+/* Animation classes */
+.modern-template .animate-fadeIn {
+    animation: fadeIn 0.6s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Hover effects */
+.modern-template .pastel-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(201, 173, 167, 0.3);
+    transition: all 0.3s ease;
+}
+
+/* Button styles */
+.modern-template .btn-modern {
+    background: linear-gradient(45deg, #9a8c98, #c9ada7);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 25px;
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(154, 140, 152, 0.3);
+}
+
+.modern-template .btn-modern:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(154, 140, 152, 0.4);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .modern-template .container {
+        padding: 0 16px;
+    }
+    
+    .modern-template h1 {
+        font-size: 2.5rem;
+    }
+    
+    .modern-template h2 {
+        font-size: 2rem;
+    }
+}

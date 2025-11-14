@@ -1,0 +1,98 @@
+================================================================================
+                    🚀 SETUP YOUR PORTFOLIO - 5 MINUTES
+================================================================================
+
+STEP 1: Open Supabase Dashboard
+--------------------------------
+URL: https://supabase.com/dashboard
+Project: djbdwbkhnrdnjreigtfz
+
+STEP 2: Open SQL Editor
+------------------------
+Left Sidebar → Click "SQL Editor"
+Top Right → Click "New Query"
+
+STEP 3: Copy the SQL
+--------------------
+Open file: SUPABASE_SETUP_COMPLETE.sql
+Select All (Ctrl+A)
+Copy (Ctrl+C)
+
+STEP 4: Paste and Edit
+----------------------
+Paste into SQL Editor (Ctrl+V)
+
+⚠️  IMPORTANT: Find this line (around line 23):
+   'your-email@example.com',
+
+Replace with YOUR actual email address
+
+STEP 5: Run It
+--------------
+Click "Run" button (or press Ctrl+Enter)
+
+STEP 6: Verify Results
+----------------------
+You should see tables showing:
+✅ Your email
+✅ Profile created
+✅ 1 organization
+✅ 1 user profile
+✅ 1 CV section
+
+STEP 7: Refresh Admin Page
+---------------------------
+Go to: http://localhost:5173/admin
+Press F5
+Try uploading a file → Should work! 🎉
+
+================================================================================
+                              QUICK TEST
+================================================================================
+
+In terminal, run:
+   node scripts/diagnose-profile.js
+
+Should show:
+   ✅ Authentication: Working
+   ✅ User Profile: Configured
+   ✅ Organization: Set up
+
+================================================================================
+                           WHAT YOU GET
+================================================================================
+
+BEFORE:                          AFTER:
+❌ Cannot upload files          ✅ Can upload files
+❌ Cannot save changes          ✅ Can save changes
+⚠️  Demo data only              ✅ Real data
+⚠️  Limited features            ✅ All features enabled
+
+================================================================================
+                              HELP
+================================================================================
+
+If something goes wrong:
+1. Check you replaced the email
+2. Verify user_id: 1f1a3c1a-e0ff-42a6-910c-930724e7ea5d
+3. Run: node scripts/diagnose-profile.js
+4. Check browser console
+
+Files to reference:
+- SUPABASE_SETUP_COMPLETE.sql (the SQL to run)
+- RUN_THIS_NOW.md (detailed guide)
+- SETUP_YOUR_PROFILE.md (troubleshooting)
+
+================================================================================
+                         READY? LET'S GO!
+================================================================================
+
+1. Open: SUPABASE_SETUP_COMPLETE.sql
+2. Copy everything
+3. Paste in Supabase SQL Editor
+4. Replace the email
+5. Click Run
+6. Refresh admin page
+7. Done! 🎉
+
+================================================================================
