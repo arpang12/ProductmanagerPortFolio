@@ -9,10 +9,26 @@ interface CaseStudyPageProps {
     navigateTo: (view: View) => void;
 }
 
-const GhibliStyledPage: React.FC<{ htmlContent: string }> = ({ htmlContent }) => {
+const GhibliStyledPage: React.FC<{ htmlContent: string; navigateTo: (view: View) => void }> = ({ htmlContent, navigateTo }) => {
      // This component is a wrapper that can inject the Ghibli styles
      // if they are not globally available. For now, we assume global styles.
-    return <div dangerouslySetInnerHTML={{ __html: htmlContent }} />;
+    return (
+        <>
+            {/* Back Button */}
+            <div className="max-w-6xl mx-auto px-4 py-4">
+                <button
+                    onClick={() => navigateTo('home')}
+                    className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors group"
+                >
+                    <svg className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    <span className="font-medium">Back to Projects</span>
+                </button>
+            </div>
+            <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
+        </>
+    );
 };
 
 const DefaultStyledPage: React.FC<{ caseStudy: CaseStudy, navigateTo: (view: View) => void; }> = ({ caseStudy, navigateTo }) => {
@@ -178,20 +194,36 @@ const DefaultStyledPage: React.FC<{ caseStudy: CaseStudy, navigateTo: (view: Vie
     );
 };
 
-const ModernStyledPage: React.FC<{ htmlContent: string }> = ({ htmlContent }) => {
+const ModernStyledPage: React.FC<{ htmlContent: string; navigateTo: (view: View) => void }> = ({ htmlContent, navigateTo }) => {
     // This component renders the modern template HTML content
-    return <div dangerouslySetInnerHTML={{ __html: htmlContent }} />;
+    return (
+        <>
+            {/* Back Button */}
+            <div className="max-w-6xl mx-auto px-4 py-4">
+                <button
+                    onClick={() => navigateTo('home')}
+                    className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors group"
+                >
+                    <svg className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    <span className="font-medium">Back to Projects</span>
+                </button>
+            </div>
+            <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
+        </>
+    );
 };
 
 const CaseStudyPage: React.FC<CaseStudyPageProps> = ({ caseStudy, navigateTo }) => {
     // If template is 'ghibli' and static content exists, render it directly.
     if (caseStudy.template === 'ghibli' && caseStudy.content) {
-        return <GhibliStyledPage htmlContent={caseStudy.content} />;
+        return <GhibliStyledPage htmlContent={caseStudy.content} navigateTo={navigateTo} />;
     }
 
     // If template is 'modern' and static content exists, render it directly.
     if (caseStudy.template === 'modern' && caseStudy.content) {
-        return <ModernStyledPage htmlContent={caseStudy.content} />;
+        return <ModernStyledPage htmlContent={caseStudy.content} navigateTo={navigateTo} />;
     }
 
     // Otherwise, use the default dynamic React rendering.
