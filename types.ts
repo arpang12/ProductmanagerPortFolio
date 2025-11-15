@@ -108,6 +108,8 @@ export interface CaseStudy {
   title: string; // Project Title, serves as the main identifier
   template: 'default' | 'ghibli' | 'modern'; // Template choice
   content?: string; // For pre-rendered HTML
+  is_published?: boolean; // Whether the case study is published
+  published_at?: string; // When it was published
   sections: {
     hero: HeroSection;
     overview: OverviewSection;

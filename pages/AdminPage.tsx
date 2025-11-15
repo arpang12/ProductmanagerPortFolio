@@ -717,6 +717,20 @@ const CaseStudyEditor: React.FC<CaseStudyEditorProps> = ({ caseStudy, onSave, on
         onSave(studyToSave);
     };
 
+    const handlePublishToggle = () => {
+        if (!formState) return;
+        
+        const newPublishedState = !formState.is_published;
+        const updatedStudy = {
+            ...formState,
+            is_published: newPublishedState,
+            published_at: newPublishedState ? new Date().toISOString() : formState.published_at
+        };
+        
+        setFormState(updatedStudy);
+        onSave(updatedStudy);
+    };
+
     if (!formState) {
         return <div className="text-center p-10">No case study selected.</div>;
     }
@@ -758,9 +772,26 @@ const CaseStudyEditor: React.FC<CaseStudyEditorProps> = ({ caseStudy, onSave, on
                                 </span>
                             </div>
                         </div>
-                        <button onClick={handleSaveAndGenerate} disabled={isSaving || Object.keys(errors).length > 0} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full shadow-lg transition disabled:bg-gray-400">
-                            {isSaving ? 'Saving...' : 'Save Changes'}
-                        </button>
+                        <div className="flex gap-3">
+                            <button 
+                                onClick={handleSaveAndGenerate} 
+                                disabled={isSaving || Object.keys(errors).length > 0} 
+                                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full shadow-lg transition disabled:bg-gray-400"
+                            >
+                                {isSaving ? 'Saving...' : 'Save Changes'}
+                            </button>
+                            <button 
+                                onClick={handlePublishToggle} 
+                                disabled={isSaving}
+                                className={`font-bold py-2 px-6 rounded-full shadow-lg transition disabled:bg-gray-400 ${
+                                    formState?.is_published 
+                                        ? 'bg-orange-600 hover:bg-orange-700 text-white' 
+                                        : 'bg-green-600 hover:bg-green-700 text-white'
+                                }`}
+                            >
+                                {formState?.is_published ? '📤 Unpublish' : '🚀 Publish'}
+                            </button>
+                        </div>
                     </div>
                 </div>
 

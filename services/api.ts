@@ -474,10 +474,11 @@ export const api = {
         case_study_id,
         title,
         hero_image_asset_id,
+        is_published,
         assets!case_studies_hero_image_asset_id_fkey (cloudinary_url),
         case_study_sections!inner (content)
       `)
-      .eq('status', 'published')
+      .eq('is_published', true)
       .eq('case_study_sections.section_type', 'hero')
     
     if (error) {
