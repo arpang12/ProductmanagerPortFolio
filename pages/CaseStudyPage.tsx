@@ -14,18 +14,16 @@ const GhibliStyledPage: React.FC<{ htmlContent: string; navigateTo: (view: View)
      // if they are not globally available. For now, we assume global styles.
     return (
         <>
-            {/* Back Button */}
-            <div className="max-w-6xl mx-auto px-4 py-4">
-                <button
-                    onClick={() => navigateTo('home')}
-                    className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors group"
-                >
-                    <svg className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                    </svg>
-                    <span className="font-medium">Back to Projects</span>
-                </button>
-            </div>
+            {/* Fixed Back Button - Always Visible */}
+            <button
+                onClick={() => navigateTo('home')}
+                className="fixed top-24 left-4 z-50 flex items-center gap-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 px-4 py-2 rounded-lg shadow-lg hover:shadow-xl transition-all group border border-gray-200 dark:border-gray-700"
+            >
+                <svg className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                <span className="font-medium">Back</span>
+            </button>
             <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
         </>
     );
@@ -38,20 +36,18 @@ const DefaultStyledPage: React.FC<{ caseStudy: CaseStudy, navigateTo: (view: Vie
          <>
             <Header navigateTo={navigateTo} />
             
+            {/* Fixed Back Button - Always Visible */}
+            <button
+                onClick={() => navigateTo('home')}
+                className="fixed top-24 left-4 z-50 flex items-center gap-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 px-4 py-2 rounded-lg shadow-lg hover:shadow-xl transition-all group border border-gray-200 dark:border-gray-700"
+            >
+                <svg className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                <span className="font-medium">Back</span>
+            </button>
+            
             <main className="pt-20">
-                {/* Back Button */}
-                <div className="max-w-6xl mx-auto px-4 py-4">
-                    <button
-                        onClick={() => navigateTo('home')}
-                        className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors group"
-                    >
-                        <svg className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                        </svg>
-                        <span className="font-medium">Back to Projects</span>
-                    </button>
-                </div>
-                
                 {/* Hero Section */}
                 {sections.hero?.enabled && (
                     <section 
@@ -198,18 +194,16 @@ const ModernStyledPage: React.FC<{ htmlContent: string; navigateTo: (view: View)
     // This component renders the modern template HTML content
     return (
         <>
-            {/* Back Button */}
-            <div className="max-w-6xl mx-auto px-4 py-4">
-                <button
-                    onClick={() => navigateTo('home')}
-                    className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors group"
-                >
-                    <svg className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                    </svg>
-                    <span className="font-medium">Back to Projects</span>
-                </button>
-            </div>
+            {/* Fixed Back Button - Always Visible */}
+            <button
+                onClick={() => navigateTo('home')}
+                className="fixed top-24 left-4 z-50 flex items-center gap-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 px-4 py-2 rounded-lg shadow-lg hover:shadow-xl transition-all group border border-gray-200 dark:border-gray-700"
+            >
+                <svg className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                <span className="font-medium">Back</span>
+            </button>
             <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
         </>
     );
