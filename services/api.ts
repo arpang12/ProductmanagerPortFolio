@@ -308,26 +308,33 @@ export const api = {
 
   // Case Studies
   async getCaseStudies(): Promise<CaseStudy[]> {
+    console.log('🔍 getCaseStudies called - fetching lightweight data for list');
+    
     const { data, error } = await supabase
       .from('case_studies')
       .select(`
         *,
         case_study_sections!inner (
-          *,
-          section_assets (
-            *,
-            assets (*)
-          ),
-          embed_widgets (*)
+          section_id,
+          section_type,
+          enabled,
+          content
         )
       `)
       .order('created_at', { ascending: false })
     
-    if (error) throw error
+    if (error) {
+      console.error('❌ Error fetching case studies:', error);
+      throw error;
+    }
+    
+    console.log(`✅ Fetched ${data?.length || 0} case studies`);
     return data.map(transformCaseStudy)
   },
 
   async getCaseStudyById(id: string): Promise<CaseStudy> {
+    console.log('🔍 getCaseStudyById called for:', id);
+    
     const { data, error } = await supabase
       .from('case_studies')
       .select(`
@@ -345,8 +352,16 @@ export const api = {
       .eq('case_study_id', id)
       .single()
     
-    if (error) throw error
-    return transformCaseStudy(data)
+    if (error) {
+      console.error('❌ Error fetching case study:', error);
+      throw error;
+    }
+    
+    console.log('✅ Case study fetched, sections:', data.case_study_sections?.length || 0);
+    const transformed = transformCaseStudy(data);
+    console.log('📦 Transformed sections:', Object.keys(transformed.sections));
+    
+    return transformed;
   },
 
   async createCaseStudy(title: string, template: 'default' | 'ghibli' | 'modern'): Promise<CaseStudy> {
@@ -367,7 +382,8 @@ export const api = {
         title,
         slug,
         template,
-        status: 'draft'
+        status: 'draft',
+        is_published: false
       })
       .select()
       .single()
@@ -382,6 +398,9 @@ export const api = {
   },
 
   async updateCaseStudy(caseStudy: CaseStudy): Promise<CaseStudy> {
+    console.log('🔄 updateCaseStudy called for:', caseStudy.id);
+    console.log('📝 Sections to save:', Object.keys(caseStudy.sections));
+    
     // Find asset_id for hero image if it exists
     let heroImageAssetId = null
     if (caseStudy.sections.hero.imageUrl) {
@@ -395,6 +414,7 @@ export const api = {
     }
     
     // Update main case study
+    console.log('💾 Updating main case study record...');
     const { error: updateError } = await supabase
       .from('case_studies')
       .update({
@@ -402,27 +422,64 @@ export const api = {
         template: caseStudy.template,
         content_html: caseStudy.content,
         hero_image_asset_id: heroImageAssetId,
+        is_published: caseStudy.is_published ?? false,
+        published_at: caseStudy.published_at,
         updated_at: new Date().toISOString()
       })
       .eq('case_study_id', caseStudy.id)
     
-    if (updateError) throw updateError
+    if (updateError) {
+      console.error('❌ Error updating case study:', updateError);
+      throw updateError;
+    }
+    console.log('✅ Main case study updated');
     
     // Update sections
+    console.log('💾 Updating sections...');
+    
+    // Define section order
+    const sectionOrder = ['hero', 'overview', 'problem', 'process', 'showcase', 'gallery', 'video', 'figma', 'miro', 'document', 'links', 'reflection'];
+    
     for (const [sectionType, sectionData] of Object.entries(caseStudy.sections)) {
-      await supabase
+      console.log(`   Saving ${sectionType}:`, {
+        enabled: sectionData.enabled,
+        hasContent: JSON.stringify(sectionData).length > 50
+      });
+      
+      // Check if section already exists
+      const { data: existingSection } = await supabase
+        .from('case_study_sections')
+        .select('section_id, order_key')
+        .eq('case_study_id', caseStudy.id)
+        .eq('section_type', sectionType)
+        .single();
+      
+      // Get order index (1-based)
+      const orderIndex = sectionOrder.indexOf(sectionType);
+      const orderKey = orderIndex >= 0 ? (orderIndex + 1).toString().padStart(6, '0') : '999999';
+      
+      const { error: sectionError } = await supabase
         .from('case_study_sections')
         .upsert({
+          section_id: existingSection?.section_id || ulid(), // Use existing ID or generate new one
           case_study_id: caseStudy.id,
           section_type: sectionType,
           enabled: sectionData.enabled,
           content: JSON.stringify(sectionData),
+          order_key: existingSection?.order_key || orderKey, // Use existing order or assign new
           updated_at: new Date().toISOString()
         }, {
           onConflict: 'case_study_id,section_type'
         })
+      
+      if (sectionError) {
+        console.error(`❌ Error saving ${sectionType} section:`, sectionError);
+        throw sectionError;
+      }
+      console.log(`   ✅ ${sectionType} saved`);
     }
     
+    console.log('✅ All sections saved successfully');
     return caseStudy
   },
 
@@ -1690,11 +1747,18 @@ function transformCaseStudy(dbRow: any): CaseStudy {
     sections['hero'].imageUrl = dbRow.assets.cloudinary_url
   }
   
+  // Migrate document section to include documents array if it doesn't exist
+  if (sections['document'] && !('documents' in sections['document'])) {
+    sections['document'].documents = []
+  }
+  
   return {
     id: dbRow.case_study_id,
     title: dbRow.title,
     template: dbRow.template,
     content: dbRow.content_html,
+    is_published: dbRow.is_published ?? false,
+    published_at: dbRow.published_at,
     sections: sections as CaseStudy['sections']
   }
 }
@@ -1880,7 +1944,7 @@ function getDefaultSectionContent(sectionType: string) {
       learnings: 'Learning 1\nLearning 2'
     },
     gallery: { images: [] },
-    document: { url: '' },
+    document: { url: '', documents: [] },
     video: { url: '', caption: '' },
     figma: { url: '', caption: '' },
     miro: { url: '', caption: '' },

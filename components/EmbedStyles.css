@@ -1,9 +1,10 @@
 /* Aspect ratio utilities for embedded content */
 .aspect-w-16 {
   position: relative;
-  padding-bottom: 56.25%; /* 16:9 aspect ratio */
+  padding-bottom: 75% !important; /* Much taller for better visibility */
   height: 0;
   overflow: hidden;
+  min-height: 600px !important; /* Larger minimum height */
 }
 
 .aspect-w-16 iframe,
@@ -166,6 +167,7 @@
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  min-height: 300px; /* Ensure container has height */
 }
 
 .dark .embed-container {
@@ -176,15 +178,23 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 200px;
+  min-height: 300px;
+  width: 100%;
   color: #6b7280;
+  background: #f8fafc;
+}
+
+.dark .embed-loading {
+  background: #1f2937;
+  color: #9ca3af;
 }
 
 .embed-error {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 200px;
+  min-height: 300px;
+  width: 100%;
   background: #fef2f2;
   color: #dc2626;
   border: 1px dashed #fca5a5;

@@ -72,9 +72,19 @@ export interface GallerySection {
     images: string[]; // Array of image URLs
 }
 
+export interface Document {
+    id: string;
+    name: string;
+    url: string;
+    type: 'pdf' | 'doc' | 'docx' | 'ppt' | 'pptx' | 'xls' | 'xlsx' | 'txt' | 'other';
+    size?: number;
+    uploadedAt?: string;
+}
+
 export interface DocumentSection {
     enabled: boolean;
-    url: string;
+    url: string; // Keep for backward compatibility
+    documents: Document[]; // New: support multiple documents
 }
 
 export interface VideoSection {

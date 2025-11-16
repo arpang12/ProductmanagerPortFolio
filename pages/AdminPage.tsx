@@ -9,6 +9,7 @@ import JourneyManager from '../components/JourneyManager';
 import ContactManager from '../components/ContactManager';
 import CVManager from '../components/CVManager';
 import AIEnhancementModal from '../components/AIEnhancementModal';
+import DocumentManager from '../components/DocumentManager';
 import { api } from '../services/api';
 import { geminiService } from '../services/geminiService';
 // FIX: Import HeroSection and OverviewSection types.
@@ -228,21 +229,40 @@ const AdminPage: React.FC<AdminPageProps> = ({ navigateTo }) => {
         }
     };
 
-    const handleEditClick = (caseStudy: CaseStudy) => {
-        setSelectedCaseStudy(caseStudy);
-        setView('editor');
+    const handleEditClick = async (caseStudy: CaseStudy) => {
+        try {
+            // Fetch fresh data from database to ensure we have latest changes
+            console.log('🔄 Fetching fresh case study data for:', caseStudy.id);
+            const freshCaseStudy = await api.getCaseStudyById(caseStudy.id);
+            setSelectedCaseStudy(freshCaseStudy);
+            setView('editor');
+        } catch (error) {
+            console.error('Failed to load case study:', error);
+            // Fallback to cached data if fetch fails
+            setSelectedCaseStudy(caseStudy);
+            setView('editor');
+        }
     };
 
     const handleSaveChanges = async (updatedStudy: CaseStudy) => {
         if (!updatedStudy) return;
         setIsSaving(true);
         try {
+            console.log('💾 Saving case study:', updatedStudy.id);
             const savedStudy = await api.updateCaseStudy(updatedStudy);
+            
+            // Update the list
             setCaseStudies(prev => prev.map(cs => cs.id === savedStudy.id ? savedStudy : cs));
+            
+            // Fetch fresh data from database to ensure editor has latest
+            console.log('🔄 Fetching fresh data after save...');
+            const freshStudy = await api.getCaseStudyById(savedStudy.id);
+            setSelectedCaseStudy(freshStudy);
+            
             alert('Changes saved successfully!');
         } catch (error) {
             console.error("Failed to save changes:", error);
-            alert('Failed to save changes.');
+            alert(`Failed to save changes: ${error.message || 'Unknown error'}`);
         } finally {
             setIsSaving(false);
         }
@@ -892,6 +912,25 @@ const SectionEditor: React.FC<SectionEditorProps> = ({ sectionName, sectionData,
                         if (field === 'url' && (sectionName === 'figma' || sectionName === 'video' || sectionName === 'miro')) {
                             return <EmbedUrlInput key={fieldKey} label={field} value={value} onChange={v => onChange(sectionName, field, v)} error={error} embedType={sectionName} />;
                         }
+                        // Document section - use DocumentManager for multiple documents
+                        if (sectionName === 'document' && field === 'documents') {
+                            return <DocumentManager key={fieldKey} documents={value || []} onChange={v => onChange(sectionName, field, v)} />;
+                        }
+                        // Document section - if we see 'url' field, also render DocumentManager if 'documents' doesn't exist
+                        if (sectionName === 'document' && field === 'url') {
+                            // Check if documents field exists in sectionData
+                            const hasDocumentsField = 'documents' in sectionData;
+                            if (!hasDocumentsField) {
+                                // Render DocumentManager here since documents field doesn't exist
+                                return (
+                                    <div key="document-manager-fallback">
+                                        <DocumentManager documents={[]} onChange={v => onChange(sectionName, 'documents', v)} />
+                                    </div>
+                                );
+                            }
+                            // If documents field exists, skip the URL field
+                            return null;
+                        }
                         // Use AI-enabled textarea for all text fields (except special cases above)
                         if (typeof value === 'string') {
                             return <FormTextareaWithAI key={fieldKey} label={field} value={value} onChange={v => onChange(sectionName, field, v)} error={error} onAIAction={onAIAction} sectionName={sectionName} field={field} setAIContext={setAIContext} setAIModalOpen={setAIModalOpen} />;
@@ -1399,6 +1438,69 @@ const ThemedPreview: React.FC<{ caseStudy: CaseStudy }> = React.memo(({ caseStud
                             )}
                         </div>
                     )}
+                    {sections.document.enabled && (sections.document.documents?.length > 0 || sections.document.url) && (
+                        <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                            <h4 className="font-semibold mb-2 flex items-center gap-2">
+                                📄 Document Section ({sections.document.documents?.length || 1} {sections.document.documents?.length === 1 ? 'document' : 'documents'})
+                            </h4>
+                            <div className="space-y-2">
+                                {sections.document.documents?.map((doc) => (
+                                    <a
+                                        key={doc.id}
+                                        href={doc.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2 text-sm text-blue-500 hover:text-blue-600 hover:underline"
+                                    >
+                                        <span>{doc.type === 'pdf' ? '📕' : doc.type === 'doc' || doc.type === 'docx' ? '📘' : doc.type === 'ppt' || doc.type === 'pptx' ? '📊' : doc.type === 'xls' || doc.type === 'xlsx' ? '📗' : '📄'}</span>
+                                        <span className="truncate">{doc.name}</span>
+                                    </a>
+                                ))}
+                                {sections.document.url && !sections.document.documents?.length && (
+                                    <a 
+                                        href={sections.document.url} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        View Document
+                                    </a>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    {sections.links.enabled && sections.links.items && sections.links.items.trim() && (
+                        <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                            <h4 className="font-semibold mb-2 flex items-center gap-2">
+                                🔗 {sections.links.title || 'Related Links'}
+                            </h4>
+                            <div className="space-y-2">
+                                {sections.links.items.split('\n').filter(item => item.trim() && item.includes('|')).slice(0, 3).map((item, index) => {
+                                    const [name, url] = item.split('|').map(s => s.trim());
+                                    return (
+                                        <a 
+                                            key={index}
+                                            href={url} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors text-sm"
+                                        >
+                                            <span className="font-medium">{name}</span>
+                                            <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                            </svg>
+                                        </a>
+                                    );
+                                })}
+                                {sections.links.items.split('\n').filter(item => item.trim() && item.includes('|')).length > 3 && (
+                                    <p className="text-xs text-gray-500 mt-1">+{sections.links.items.split('\n').filter(item => item.trim() && item.includes('|')).length - 3} more links</p>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
             }
         </div>
@@ -1558,6 +1660,108 @@ const generateGhibliHTML = (caseStudy: CaseStudy): string => {
                 </div>`).join('')}
             </div>
         </div>`;
+    }
+
+    // Video Section
+    if (sections.video.enabled && sections.video.url) {
+        const getYouTubeEmbedUrl = (url: string) => {
+            let videoId = '';
+            try {
+                const urlObj = new URL(url);
+                if (urlObj.hostname === 'youtu.be') {
+                    videoId = urlObj.pathname.slice(1);
+                } else if (urlObj.hostname.includes('youtube.com')) {
+                    videoId = urlObj.searchParams.get('v') || '';
+                }
+                return videoId ? `https://www.youtube.com/embed/${videoId}` : '';
+            } catch (error) {
+                return '';
+            }
+        };
+        const embedUrl = getYouTubeEmbedUrl(sections.video.url);
+        if (embedUrl) {
+            html += `
+            <div class="ghibli-section">
+                <h2 class="ghibli-title">🎥 Demo Video</h2>
+                <div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 8px; border: 3px solid #90ee90;">
+                    <iframe src="${embedUrl}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;" frameborder="0" allowfullscreen></iframe>
+                </div>
+                ${sections.video.caption ? `<p style="margin-top: 0.5rem; font-style: italic; color: #2d5016;">${sections.video.caption}</p>` : ''}
+            </div>`;
+        }
+    }
+
+    // Figma Section
+    if (sections.figma.enabled && sections.figma.url) {
+        let embedUrl = sections.figma.url;
+        if (!embedUrl.includes('figma.com/embed') && (embedUrl.includes('figma.com/file/') || embedUrl.includes('figma.com/design/') || embedUrl.includes('figma.com/proto/'))) {
+            embedUrl = `https://www.figma.com/embed?embed_host=share&url=${encodeURIComponent(embedUrl)}`;
+        }
+        html += `
+        <div class="ghibli-section">
+            <h2 class="ghibli-title">🎨 Figma Prototype</h2>
+            <div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 8px; border: 3px solid #90ee90;">
+                <iframe src="${embedUrl}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;" allowfullscreen></iframe>
+            </div>
+            ${sections.figma.caption ? `<p style="margin-top: 0.5rem; font-style: italic; color: #2d5016;">${sections.figma.caption}</p>` : ''}
+        </div>`;
+    }
+
+    // Miro Section
+    if (sections.miro.enabled && sections.miro.url) {
+        let embedUrl = sections.miro.url;
+        if (!embedUrl.includes('miro.com/app/live-embed') && embedUrl.includes('miro.com/app/board/')) {
+            const boardIdMatch = embedUrl.match(/\/board\/([^\/\?]+)/);
+            if (boardIdMatch) {
+                const boardId = boardIdMatch[1];
+                embedUrl = `https://miro.com/app/live-embed/${boardId}/?moveToViewport=-1000,-1000,2000,2000`;
+            }
+        }
+        html += `
+        <div class="ghibli-section">
+            <h2 class="ghibli-title">📋 Miro Board</h2>
+            <div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 8px; border: 3px solid #90ee90;">
+                <iframe src="${embedUrl}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;" frameborder="0" scrolling="no" allowfullscreen></iframe>
+            </div>
+            ${sections.miro.caption ? `<p style="margin-top: 0.5rem; font-style: italic; color: #2d5016;">${sections.miro.caption}</p>` : ''}
+        </div>`;
+    }
+
+    // Document Section
+    if (sections.document.enabled && sections.document.url) {
+        html += `
+        <div class="ghibli-section" style="text-align: center;">
+            <h2 class="ghibli-title">📄 Project Documentation</h2>
+            <a href="${sections.document.url}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 0.5rem; background: linear-gradient(45deg, #32cd32, #228b22); color: white; padding: 1rem 2rem; border-radius: 25px; text-decoration: none; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: transform 0.2s;">
+                <svg style="width: 1.5rem; height: 1.5rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                View Document
+            </a>
+        </div>`;
+    }
+
+    // Links Section
+    if (sections.links.enabled && sections.links.items && sections.links.items.trim()) {
+        const links = sections.links.items.split('\n').filter(item => item.trim() && item.includes('|'));
+        if (links.length > 0) {
+            html += `
+            <div class="ghibli-section">
+                <h2 class="ghibli-title">🔗 ${sections.links.title || 'Related Links'}</h2>
+                <div style="display: grid; gap: 0.8rem;">
+                    ${links.map(item => {
+                        const [name, url] = item.split('|').map(s => s.trim());
+                        return `
+                        <a href="${url}" target="_blank" rel="noopener noreferrer" style="display: flex; align-items: center; justify-content: space-between; padding: 1rem; background: #f0fff0; border: 2px solid #90ee90; border-radius: 8px; text-decoration: none; color: #2d5016; font-weight: 600; transition: all 0.2s;">
+                            <span>${name}</span>
+                            <svg style="width: 1.2rem; height: 1.2rem; color: #32cd32;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                        </a>`;
+                    }).join('')}
+                </div>
+            </div>`;
+        }
     }
 
     html += `</div>`;
@@ -1730,17 +1934,104 @@ const generateModernHTML = (caseStudy: CaseStudy): string => {
 
     // Video Section
     if (sections.video.enabled && sections.video.url) {
-        const embedUrl = sections.video.url.includes('youtube.com') || sections.video.url.includes('youtu.be') 
-            ? sections.video.url.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')
-            : sections.video.url;
+        const getYouTubeEmbedUrl = (url: string) => {
+            let videoId = '';
+            try {
+                const urlObj = new URL(url);
+                if (urlObj.hostname === 'youtu.be') {
+                    videoId = urlObj.pathname.slice(1);
+                } else if (urlObj.hostname.includes('youtube.com')) {
+                    videoId = urlObj.searchParams.get('v') || '';
+                }
+                return videoId ? `https://www.youtube.com/embed/${videoId}` : '';
+            } catch (error) {
+                return '';
+            }
+        };
+        const embedUrl = getYouTubeEmbedUrl(sections.video.url);
+        if (embedUrl) {
+            html += `
+            <div class="modern-section">
+                <h2 class="modern-title">🎥 Demo Video</h2>
+                <div style="aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 25px rgba(0,0,0,0.15);">
+                    <iframe src="${embedUrl}" style="width: 100%; height: 100%; border: none;" allowfullscreen></iframe>
+                </div>
+                ${sections.video.caption ? `<p style="margin-top: 1rem; color: #718096; font-style: italic;">${sections.video.caption}</p>` : ''}
+            </div>`;
+        }
+    }
+
+    // Figma Section
+    if (sections.figma.enabled && sections.figma.url) {
+        let embedUrl = sections.figma.url;
+        if (!embedUrl.includes('figma.com/embed') && (embedUrl.includes('figma.com/file/') || embedUrl.includes('figma.com/design/') || embedUrl.includes('figma.com/proto/'))) {
+            embedUrl = `https://www.figma.com/embed?embed_host=share&url=${encodeURIComponent(embedUrl)}`;
+        }
         html += `
         <div class="modern-section">
-            <h2 class="modern-title">Demo Video</h2>
+            <h2 class="modern-title">🎨 Figma Prototype</h2>
             <div style="aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 25px rgba(0,0,0,0.15);">
                 <iframe src="${embedUrl}" style="width: 100%; height: 100%; border: none;" allowfullscreen></iframe>
             </div>
-            ${sections.video.caption ? `<p style="margin-top: 1rem; color: #718096; font-style: italic;">${sections.video.caption}</p>` : ''}
+            ${sections.figma.caption ? `<p style="margin-top: 1rem; color: #718096; font-style: italic;">${sections.figma.caption}</p>` : ''}
         </div>`;
+    }
+
+    // Miro Section
+    if (sections.miro.enabled && sections.miro.url) {
+        let embedUrl = sections.miro.url;
+        if (!embedUrl.includes('miro.com/app/live-embed') && embedUrl.includes('miro.com/app/board/')) {
+            const boardIdMatch = embedUrl.match(/\/board\/([^\/\?]+)/);
+            if (boardIdMatch) {
+                const boardId = boardIdMatch[1];
+                embedUrl = `https://miro.com/app/live-embed/${boardId}/?moveToViewport=-1000,-1000,2000,2000`;
+            }
+        }
+        html += `
+        <div class="modern-section">
+            <h2 class="modern-title">📋 Miro Board</h2>
+            <div style="aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 25px rgba(0,0,0,0.15);">
+                <iframe src="${embedUrl}" style="width: 100%; height: 100%; border: none;" frameborder="0" scrolling="no" allowfullscreen></iframe>
+            </div>
+            ${sections.miro.caption ? `<p style="margin-top: 1rem; color: #718096; font-style: italic;">${sections.miro.caption}</p>` : ''}
+        </div>`;
+    }
+
+    // Document Section
+    if (sections.document.enabled && sections.document.url) {
+        html += `
+        <div class="modern-section" style="text-align: center;">
+            <h2 class="modern-title">📄 Project Documentation</h2>
+            <a href="${sections.document.url}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 0.75rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1.2rem 2.5rem; border-radius: 50px; text-decoration: none; font-weight: 600; box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4); transition: all 0.3s; font-size: 1.1rem;">
+                <svg style="width: 1.5rem; height: 1.5rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                View Document
+            </a>
+        </div>`;
+    }
+
+    // Links Section
+    if (sections.links.enabled && sections.links.items && sections.links.items.trim()) {
+        const links = sections.links.items.split('\n').filter(item => item.trim() && item.includes('|'));
+        if (links.length > 0) {
+            html += `
+            <div class="modern-section">
+                <h2 class="modern-title">🔗 ${sections.links.title || 'Related Links'}</h2>
+                <div style="display: grid; gap: 1rem; margin-top: 1rem;">
+                    ${links.map(item => {
+                        const [name, url] = item.split('|').map(s => s.trim());
+                        return `
+                        <a href="${url}" target="_blank" rel="noopener noreferrer" style="display: flex; align-items: center; justify-content: space-between; padding: 1.2rem; background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(102, 126, 234, 0.2); border-radius: 12px; text-decoration: none; color: #2d3748; font-weight: 600; transition: all 0.3s; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+                            <span style="background: linear-gradient(135deg, #667eea, #764ba2); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;">${name}</span>
+                            <svg style="width: 1.2rem; height: 1.2rem; color: #667eea;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                        </a>`;
+                    }).join('')}
+                </div>
+            </div>`;
+        }
     }
 
     html += `</div>`;
