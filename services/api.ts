@@ -2088,17 +2088,17 @@ export const api = {
   // Data Symmetry Methods (for useDataSymmetry hook)
   async verifyDataSymmetry(): Promise<{
     isSymmetric: boolean;
-    issues: string[];
-    adminData: any;
-    publicData: any;
+    differences: string[];
+    authenticatedCount: number;
+    publicCount: number;
   }> {
     const orgId = await getUserOrgId();
     if (!orgId) {
       return {
         isSymmetric: false,
-        issues: ['User not authenticated'],
-        adminData: null,
-        publicData: null
+        differences: ['User not authenticated'],
+        authenticatedCount: 0,
+        publicCount: 0
       };
     }
 
@@ -2116,18 +2116,18 @@ export const api = {
       contact: await this.getPublicContactInfo(orgId)
     };
 
-    const issues: string[] = [];
+    const differences: string[] = [];
     
     // Compare case studies
     if (adminData.caseStudies.length !== publicData.caseStudies.length) {
-      issues.push(`Case studies count mismatch: Admin(${adminData.caseStudies.length}) vs Public(${publicData.caseStudies.length})`);
+      differences.push(`Case studies count mismatch: Admin(${adminData.caseStudies.length}) vs Public(${publicData.caseStudies.length})`);
     }
 
     return {
-      isSymmetric: issues.length === 0,
-      issues,
-      adminData,
-      publicData
+      isSymmetric: differences.length === 0,
+      differences,
+      authenticatedCount: adminData.caseStudies.length,
+      publicCount: publicData.caseStudies.length
     };
   },
 

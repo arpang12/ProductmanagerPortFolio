@@ -26,7 +26,10 @@ export const useDataSymmetry = () => {
     try {
       const result = await api.verifyDataSymmetry();
       setSymmetryStatus({
-        ...result,
+        isSymmetric: result.isSymmetric,
+        differences: result.differences,
+        authenticatedCount: result.authenticatedCount,
+        publicCount: result.publicCount,
         lastChecked: new Date(),
         isChecking: false
       });
