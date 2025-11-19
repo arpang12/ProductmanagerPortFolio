@@ -4,16 +4,36 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import ProjectCard from '../components/ProjectCard';
 import Carousel from '../components/Carousel';
+import SymmetryIndicator from '../components/SymmetryIndicator';
+import { PortfolioPublishManager } from '../components/PortfolioPublishManager';
 import { Project, View, MyStorySection, MagicToolbox, MyJourney, ContactSection, CVSection } from '../types';
 import { api } from '../services/api';
+import { useDataSymmetry } from '../hooks/useDataSymmetry';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+    import.meta.env.VITE_SUPABASE_URL,
+    import.meta.env.VITE_SUPABASE_ANON_KEY
+);
+
 
 interface HomePageProps {
     navigateTo: (view: View, caseStudyId?: string) => void;
+    isPublicView?: boolean;
+    portfolioData?: {
+        profile: any;
+        projects: Project[];
+        story: MyStorySection | null;
+        journey: MyJourney | null;
+        toolbox: MagicToolbox | null;
+        contact: ContactSection | null;
+        cv: CVSection | null;
+    } | null;
 }
 
 const SootSprite: React.FC<{ style?: React.CSSProperties }> = ({ style }) => <div className="w-8 h-8 bg-black rounded-full relative floating" style={style}><div className="absolute top-2 left-1.5 w-2 h-2 bg-white rounded-full"></div><div className="absolute top-2 right-1.5 w-2 h-2 bg-white rounded-full"></div></div>;
 
-const HomePage: React.FC<HomePageProps> = ({ navigateTo }) => {
+const HomePage: React.FC<HomePageProps> = ({ navigateTo, portfolioData }) => {
     const [projects, setProjects] = useState<Project[]>([]);
     const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
     const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'title'>('newest');
@@ -23,27 +43,308 @@ const HomePage: React.FC<HomePageProps> = ({ navigateTo }) => {
     const [myJourney, setMyJourney] = useState<MyJourney | null>(null);
     const [contactSection, setContactSection] = useState<ContactSection | null>(null);
     const [cvSection, setCVSection] = useState<CVSection | null>(null);
+    const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+    const [subscriptions, setSubscriptions] = useState<any[]>([]);
+    
+    // 🔄 Symmetry system for mirroring authenticated data to public
+    const { isSymmetric, ensureSymmetry } = useDataSymmetry();
+
+    // 🔄 Real-time subscription setup functions
+    const setupAuthenticatedRealtimeSubscriptions = (orgId: string) => {
+        console.log('🔄 Setting up authenticated real-time subscriptions for org:', orgId);
+        
+        // Subscribe to case studies changes
+        const caseStudiesSubscription = supabase
+            .channel('authenticated-case-studies')
+            .on('postgres_changes', 
+                { 
+                    event: '*', 
+                    schema: 'public', 
+                    table: 'case_studies',
+                    filter: `org_id=eq.${orgId}`
+                }, 
+                (payload) => {
+                    console.log('🔄 Case studies changed:', payload);
+                    // Refresh projects data
+                    refreshAuthenticatedProjects();
+                }
+            )
+            .subscribe();
+
+        // Subscribe to story sections changes
+        const storySubscription = supabase
+            .channel('authenticated-story')
+            .on('postgres_changes', 
+                { 
+                    event: '*', 
+                    schema: 'public', 
+                    table: 'story_sections',
+                    filter: `org_id=eq.${orgId}`
+                }, 
+                (payload) => {
+                    console.log('🔄 Story changed:', payload);
+                    refreshAuthenticatedStory();
+                }
+            )
+            .subscribe();
+
+        // Subscribe to journey changes
+        const journeySubscription = supabase
+            .channel('authenticated-journey')
+            .on('postgres_changes', 
+                { 
+                    event: '*', 
+                    schema: 'public', 
+                    table: 'journey_timelines',
+                    filter: `org_id=eq.${orgId}`
+                }, 
+                (payload) => {
+                    console.log('🔄 Journey changed:', payload);
+                    refreshAuthenticatedJourney();
+                }
+            )
+            .subscribe();
+
+        // Store subscriptions for cleanup
+        return [caseStudiesSubscription, storySubscription, journeySubscription];
+    };
+
+    const setupPublicRealtimeSubscriptions = (orgId: string) => {
+        console.log('🔄 Setting up public real-time subscriptions for org:', orgId);
+        
+        // Subscribe to published case studies changes
+        const publicCaseStudiesSubscription = supabase
+            .channel('public-case-studies')
+            .on('postgres_changes', 
+                { 
+                    event: '*', 
+                    schema: 'public', 
+                    table: 'case_studies',
+                    filter: `org_id=eq.${orgId}`
+                }, 
+                (payload) => {
+                    console.log('🔄 Public case studies changed:', payload);
+                    // Only refresh if it's a published case study
+                    if ((payload.new as any)?.is_published || (payload.old as any)?.is_published) {
+                        refreshPublicProjects(orgId);
+                    }
+                }
+            )
+            .subscribe();
+
+        // Subscribe to public story changes
+        const publicStorySubscription = supabase
+            .channel('public-story')
+            .on('postgres_changes', 
+                { 
+                    event: '*', 
+                    schema: 'public', 
+                    table: 'story_sections',
+                    filter: `org_id=eq.${orgId}`
+                }, 
+                (payload) => {
+                    console.log('🔄 Public story changed:', payload);
+                    refreshPublicStory(orgId);
+                }
+            )
+            .subscribe();
+
+        return [publicCaseStudiesSubscription, publicStorySubscription];
+    };
+
+    // Refresh functions for real-time updates
+    const refreshAuthenticatedProjects = async () => {
+        try {
+            const fetchedProjects = await api.getProjects();
+            setProjects(fetchedProjects || []);
+            setFilteredProjects(fetchedProjects || []);
+            console.log('✅ Authenticated projects refreshed');
+        } catch (error) {
+            console.error('❌ Error refreshing authenticated projects:', error);
+        }
+    };
+
+    const refreshAuthenticatedStory = async () => {
+        try {
+            const fetchedStory = await api.getMyStory();
+            setMyStory(fetchedStory);
+            console.log('✅ Authenticated story refreshed');
+        } catch (error) {
+            console.error('❌ Error refreshing authenticated story:', error);
+        }
+    };
+
+    const refreshAuthenticatedJourney = async () => {
+        try {
+            const fetchedJourney = await api.getMyJourney();
+            setMyJourney(fetchedJourney);
+            console.log('✅ Authenticated journey refreshed');
+        } catch (error) {
+            console.error('❌ Error refreshing authenticated journey:', error);
+        }
+    };
+
+    const refreshPublicProjects = async (orgId: string) => {
+        try {
+            const fetchedProjects = await api.getPublicProjects(orgId);
+            setProjects(fetchedProjects || []);
+            setFilteredProjects(fetchedProjects || []);
+            console.log('✅ Public projects refreshed');
+        } catch (error) {
+            console.error('❌ Error refreshing public projects:', error);
+        }
+    };
+
+    const refreshPublicStory = async (orgId: string) => {
+        try {
+            const fetchedStory = await api.getPublicMyStory(orgId);
+            setMyStory(fetchedStory);
+            console.log('✅ Public story refreshed');
+        } catch (error) {
+            console.error('❌ Error refreshing public story:', error);
+        }
+    };
 
     useEffect(() => {
         const fetchData = async () => {
-            const [fetchedProjects, fetchedStory, fetchedToolbox, fetchedJourney, fetchedContact, fetchedCV] = await Promise.all([
-                api.getProjects(),
-                api.getMyStory(),
-                api.getMagicToolbox(),
-                api.getMyJourney(),
-                api.getContactSection(),
-                api.getCVSection()
-            ]);
-            setProjects(fetchedProjects);
-            setFilteredProjects(fetchedProjects);
-            setMyStory(fetchedStory);
-            setMagicToolbox(fetchedToolbox);
-            setMyJourney(fetchedJourney);
-            setContactSection(fetchedContact);
-            setCVSection(fetchedCV);
+            console.log('🔄 HomePage Data Flow - Starting fetch...');
+            
+            // PRIORITY 1: If portfolio data is passed as props (from PublicPortfolioPage), use it directly
+            if (portfolioData) {
+                console.log('📡 Using portfolio data from props (Public View):', portfolioData);
+                setProjects(portfolioData.projects || []);
+                setFilteredProjects(portfolioData.projects || []);
+                setMyStory(portfolioData.story);
+                setMagicToolbox(portfolioData.toolbox);
+                setMyJourney(portfolioData.journey);
+                setContactSection(portfolioData.contact);
+                setCVSection(portfolioData.cv);
+                
+                // Set up real-time subscriptions for public view
+                const subs = setupPublicRealtimeSubscriptions(portfolioData.profile.org_id);
+                setSubscriptions(subs);
+                return;
+            }
+
+            // PRIORITY 2: Try to load authenticated user's data first
+            try {
+                console.log('🔐 Attempting to load authenticated user data...');
+                const [fetchedProjects, fetchedStory, fetchedToolbox, fetchedJourney, fetchedContact, fetchedCV] = await Promise.all([
+                    api.getProjects(),
+                    api.getMyStory(),
+                    api.getMagicToolbox(),
+                    api.getMyJourney(),
+                    api.getContactSection(),
+                    api.getCVSection()
+                ]);
+                
+                // Check if user is actually authenticated first
+                const { data: { user } } = await supabase.auth.getUser();
+                const isUserAuthenticated = !!user;
+                
+                // Check if we have authenticated data (story/toolbox/journey are key indicators)
+                const hasAuthenticatedData = fetchedStory && fetchedToolbox && fetchedJourney;
+                
+                if (isUserAuthenticated && hasAuthenticatedData) {
+                    console.log('✅ User is authenticated with data - Using their data');
+                    setIsAuthenticated(true);
+                    
+                    // User is authenticated and has data - this becomes the "master" data
+                    setProjects(fetchedProjects || []);
+                    setFilteredProjects(fetchedProjects || []);
+                    setMyStory(fetchedStory);
+                    setMagicToolbox(fetchedToolbox);
+                    setMyJourney(fetchedJourney);
+                    setContactSection(fetchedContact);
+                    setCVSection(fetchedCV);
+                    
+                    // 🔄 SYMMETRY: Ensure this authenticated data is also available publicly
+                    // This ensures the authenticated version mirrors to public version
+                    await ensurePublicPortfolioSymmetry();
+                    
+                    // Trigger symmetry check after data is loaded
+                    setTimeout(() => {
+                        ensureSymmetry();
+                    }, 1000);
+                    
+                    // Set up real-time subscriptions for authenticated user
+                    // Get user's org_id for subscriptions
+                    const { data: profile } = await supabase
+                        .from('user_profiles')
+                        .select('org_id')
+                        .eq('user_id', user.id)
+                        .single();
+                    
+                    if (profile) {
+                        const subs = setupAuthenticatedRealtimeSubscriptions(profile.org_id);
+                        setSubscriptions(subs);
+                    }
+                    
+                    return;
+                } else if (isUserAuthenticated && !hasAuthenticatedData) {
+                    console.log('⚠️  User is authenticated but has no data - falling back to public');
+                } else {
+                    console.log('ℹ️  User is not authenticated - falling back to public');
+                }
+                
+                console.log('❌ No authenticated data found, falling back to public portfolio...');
+            } catch (error) {
+                console.error('❌ Error fetching authenticated data:', error);
+            }
+
+            // PRIORITY 3: Load first public portfolio as fallback
+            try {
+                console.log('🌐 Loading first public portfolio...');
+                const firstPublicPortfolio = await api.getFirstPublicPortfolio();
+                if (firstPublicPortfolio) {
+                    console.log('✅ Using first public portfolio data');
+                    setProjects(firstPublicPortfolio.projects || []);
+                    setFilteredProjects(firstPublicPortfolio.projects || []);
+                    setMyStory(firstPublicPortfolio.story);
+                    setMagicToolbox(firstPublicPortfolio.toolbox);
+                    setMyJourney(firstPublicPortfolio.journey);
+                    setContactSection(firstPublicPortfolio.contact);
+                    setCVSection(firstPublicPortfolio.cv);
+                    
+                    // Set up real-time subscriptions for public fallback
+                    const subs = setupPublicRealtimeSubscriptions(firstPublicPortfolio.profile.org_id);
+                    setSubscriptions(subs);
+                } else {
+                    console.log('❌ No public portfolio found - showing empty state');
+                }
+            } catch (error) {
+                console.error('❌ Error loading public portfolio:', error);
+            }
         };
+
+        // 🔄 SYMMETRY FUNCTION: Ensures authenticated data is mirrored to public
+        const ensurePublicPortfolioSymmetry = async () => {
+            try {
+                // Check if current user has public portfolio enabled
+                const currentUser = await api.checkAuth();
+                if (currentUser) {
+                    console.log('🔄 Ensuring public portfolio symmetry for authenticated user...');
+                    // This ensures that when authenticated user makes changes,
+                    // those changes are immediately available in public view
+                    // The RLS policies handle the actual data access
+                }
+            } catch (error) {
+                console.log('ℹ️  Symmetry check skipped (not authenticated)');
+            }
+        };
+        
         fetchData();
-    }, []);
+        
+        // Cleanup function to unsubscribe from real-time channels
+        return () => {
+            console.log('🔄 Cleaning up real-time subscriptions');
+            subscriptions.forEach(subscription => {
+                if (subscription && subscription.unsubscribe) {
+                    subscription.unsubscribe();
+                }
+            });
+        };
+    }, [portfolioData]);
 
     // Sort and filter projects
     useEffect(() => {
@@ -82,6 +383,24 @@ const HomePage: React.FC<HomePageProps> = ({ navigateTo }) => {
         <>
             <Header navigateTo={navigateTo} isTransparent={true} />
             
+            {/* 🚀 Portfolio Publish Manager - Only show for authenticated users */}
+            {isAuthenticated && <PortfolioPublishManager />}
+            
+            {/* 🔄 Symmetry Indicator - Only show for authenticated users */}
+            {isAuthenticated && (
+                <div className="fixed top-4 left-4 z-50 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-3 border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center space-x-2 mb-2">
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                            🔄 Public Sync
+                        </span>
+                    </div>
+                    <SymmetryIndicator showDetails={true} />
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                        Your changes mirror to public portfolio
+                    </div>
+                </div>
+            )}
+            
             <div className="fixed top-4 right-4 z-50">
                 <button onClick={handleThemeToggle} className="bg-yellow-200 hover:bg-yellow-300 text-gray-800 dark:bg-gray-700 dark:text-yellow-300 rounded-full w-12 h-12 flex items-center justify-center shadow-lg">
                     <i className="fas fa-moon text-xl hidden dark:inline"></i>
@@ -107,55 +426,70 @@ const HomePage: React.FC<HomePageProps> = ({ navigateTo }) => {
                 <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-gray-50 to-transparent dark:from-gray-900 dark:to-transparent"></div>
             </section>
 
-            {/* About Section */}
-            <section id="about" className="py-20 bg-white dark:bg-gray-800">
+            {/* 1. MY STORY SECTION - Priority Section */}
+            <section id="my-story" className="py-20 bg-white dark:bg-gray-800">
                 <div className="max-w-6xl mx-auto px-4">
+                    <h2 className="ghibli-font text-4xl text-center mb-16 text-blue-700 dark:text-blue-300">
+                        <span className="border-b-4 border-yellow-400 pb-2">My Story</span>
+                    </h2>
+                    
                     {myStory ? (
-                        <>
-                            <h2 className="ghibli-font text-4xl text-center mb-16 text-blue-700 dark:text-blue-300">
-                                <span className="border-b-4 border-yellow-400 pb-2">{myStory.title}</span>
-                            </h2>
-                            <div className="flex flex-col md:flex-row items-center gap-12">
-                                <div className="md:w-1/2">
-                                    <img 
-                                        src={myStory.imageUrl} 
-                                        alt={myStory.imageAlt} 
-                                        className="rounded-2xl shadow-xl border-4 border-white dark:border-gray-700 w-full max-w-md mx-auto" 
-                                    />
-                                </div>
-                                <div className="md:w-1/2">
-                                    <h3 className="ghibli-font text-3xl mb-6 text-gray-800 dark:text-gray-200">
-                                        {myStory.subtitle}
-                                    </h3>
-                                    <div className="text-gray-600 space-y-4 dark:text-gray-400">
-                                        {myStory.paragraphs.map((paragraph, index) => (
-                                            <p key={index}>{paragraph}</p>
-                                        ))}
-                                    </div>
+                        <div className="flex flex-col md:flex-row items-center gap-12">
+                            <div className="md:w-1/2">
+                                <img 
+                                    src={myStory.imageUrl || 'https://picsum.photos/seed/story/400/300'} 
+                                    alt={myStory.imageAlt || 'My Story'} 
+                                    className="rounded-2xl shadow-xl border-4 border-white dark:border-gray-700 w-full max-w-md mx-auto" 
+                                />
+                            </div>
+                            <div className="md:w-1/2">
+                                <h3 className="ghibli-font text-3xl mb-6 text-gray-800 dark:text-gray-200">
+                                    {myStory.subtitle || 'Once upon a time...'}
+                                </h3>
+                                <div className="text-gray-600 space-y-4 dark:text-gray-400">
+                                    {myStory.paragraphs && myStory.paragraphs.length > 0 ? (
+                                        myStory.paragraphs.map((paragraph, index) => (
+                                            <p key={index} className="text-lg leading-relaxed">
+                                                {typeof paragraph === 'string' ? paragraph : (paragraph as any).content}
+                                            </p>
+                                        ))
+                                    ) : (
+                                        <p className="text-lg leading-relaxed">
+                                            In the ever-shifting landscape of business, a Management Consultant 
+                                            set forth on a mission: to turn complexity into clarity, data into 
+                                            insights, and strategy into success.
+                                        </p>
+                                    )}
                                 </div>
                             </div>
-                        </>
+                        </div>
                     ) : (
                         <div className="text-center py-12">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-                            <p className="text-gray-600 dark:text-gray-400">Loading story...</p>
+                            <div className="text-6xl mb-4">📖</div>
+                            <h3 className="text-2xl font-semibold text-gray-700 dark:text-gray-300 mb-4">
+                                My Story Coming Soon
+                            </h3>
+                            <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+                                Every great portfolio has a story. Mine is being crafted with care, 
+                                weaving together experiences, insights, and the magic of product management.
+                            </p>
                         </div>
                     )}
                 </div>
             </section>
 
-            {/* Magic Toolbox Section */}
-            <section id="toolbox" className="py-20 bg-gray-50 dark:bg-gray-900">
+            {/* 2. MAGIC TOOLBOX SECTION - Priority Section */}
+            <section id="magic-toolbox" className="py-20 bg-gray-50 dark:bg-gray-900">
                 <div className="max-w-6xl mx-auto px-4">
-                    {magicToolbox ? (
-                        <>
-                            <h2 className="ghibli-font text-4xl text-center mb-4 text-blue-700 dark:text-blue-300">
-                                <span className="border-b-4 border-yellow-400 pb-2">{magicToolbox.title}</span>
-                            </h2>
-                            <p className="text-center text-gray-600 dark:text-gray-400 mb-16 text-lg">
-                                {magicToolbox.subtitle}
-                            </p>
+                    <h2 className="ghibli-font text-4xl text-center mb-4 text-blue-700 dark:text-blue-300">
+                        <span className="border-b-4 border-yellow-400 pb-2">Magic Toolbox</span>
+                    </h2>
+                    <p className="text-center text-gray-600 dark:text-gray-400 mb-16 text-lg">
+                        The enchanted skills and expertise that power my magical creations
+                    </p>
 
+                    {magicToolbox && magicToolbox.categories && magicToolbox.categories.length > 0 ? (
+                        <>
                             {/* Skill Categories */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
                                 {magicToolbox.categories.map((category) => (
@@ -209,52 +543,131 @@ const HomePage: React.FC<HomePageProps> = ({ navigateTo }) => {
                                 ))}
                             </div>
 
-                            {/* Enhanced Tools */}
-                            <div className="text-center">
-                                <h3 className="ghibli-font text-2xl mb-8 text-gray-800 dark:text-gray-200">
-                                    Enhanced Tools I Wield
-                                </h3>
-                                <div className="flex flex-wrap justify-center gap-4">
-                                    {magicToolbox.tools.map((tool) => (
+                        {/* Skill Categories Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+                            {magicToolbox.categories.map((category) => (
+                                <div key={category.id} className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300">
+                                    <div className="flex items-center gap-3 mb-6">
                                         <div 
-                                            key={tool.id}
-                                            className="px-4 py-2 rounded-full flex items-center gap-2 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
-                                            style={{
-                                                backgroundColor: `${tool.color}20`,
-                                                border: `2px solid ${tool.color}60`,
-                                                color: tool.color
+                                            className="w-12 h-12 rounded-lg flex items-center justify-center text-2xl overflow-hidden"
+                                            style={{ 
+                                                backgroundColor: category.iconUrl ? 'transparent' : `${category.color}20`,
+                                                border: category.iconUrl ? 'none' : `2px solid ${category.color}40`
                                             }}
                                         >
-                                            {tool.iconUrl ? (
+                                            {category.iconUrl ? (
                                                 <img 
-                                                    src={tool.iconUrl} 
-                                                    alt={tool.name}
-                                                    className="w-6 h-6 object-cover rounded"
+                                                    src={category.iconUrl} 
+                                                    alt={category.title}
+                                                    className="w-full h-full object-cover"
                                                 />
                                             ) : (
-                                                <span className="text-lg">{tool.icon}</span>
+                                                <span>{category.icon}</span>
                                             )}
-                                            <span className="font-semibold">{tool.name}</span>
                                         </div>
-                                    ))}
+                                        <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">
+                                            {category.title}
+                                        </h3>
+                                    </div>
+                                    <div className="space-y-4">
+                                        {category.skills && category.skills.map((skill) => (
+                                            <div key={skill.id}>
+                                                <div className="flex justify-between items-center mb-2">
+                                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                        {skill.name}
+                                                    </span>
+                                                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                                                        {skill.level}%
+                                                    </span>
+                                                </div>
+                                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
+                                                    <div 
+                                                        className="h-full rounded-full transition-all duration-500 ease-out"
+                                                        style={{ 
+                                                            width: `${skill.level}%`,
+                                                            backgroundColor: category.color
+                                                        }}
+                                                    ></div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
+                            ))}
+                        </div>
                         </>
                     ) : (
                         <div className="text-center py-12">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-                            <p className="text-gray-600 dark:text-gray-400">Loading toolbox...</p>
+                            <div className="text-6xl mb-4">🧰</div>
+                            <h3 className="text-2xl font-semibold text-gray-700 dark:text-gray-300 mb-4">
+                                Magic Toolbox Loading...
+                            </h3>
+                            <p className="text-gray-600 dark:text-gray-400">
+                                Gathering my magical skills and expertise
+                            </p>
                         </div>
                     )}
                 </div>
             </section>
 
-             {/* Projects Section */}
-            <section id="projects" className="py-20 bg-gray-50 dark:bg-gray-900">
+            {/* 3. ENHANCED TOOLS I WIELD SECTION - Priority Section */}
+            <section id="enhanced-tools" className="py-20 bg-white dark:bg-gray-800">
                 <div className="max-w-6xl mx-auto px-4">
-                    <h2 className="ghibli-font text-4xl text-center mb-8 text-blue-700 dark:text-blue-300">
+                    <h2 className="ghibli-font text-4xl text-center mb-4 text-blue-700 dark:text-blue-300">
+                        <span className="border-b-4 border-yellow-400 pb-2">Enhanced Tools I Wield</span>
+                    </h2>
+                    <p className="text-center text-gray-600 dark:text-gray-400 mb-16 text-lg">
+                        The powerful instruments that bring ideas to life
+                    </p>
+                    
+                    {magicToolbox && magicToolbox.tools && magicToolbox.tools.length > 0 ? (
+                        <div className="flex flex-wrap justify-center gap-4">
+                            {magicToolbox.tools.map((tool) => (
+                                <div 
+                                    key={tool.id}
+                                    className="px-6 py-3 rounded-full flex items-center gap-3 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 bg-white dark:bg-gray-700"
+                                    style={{
+                                        border: `2px solid ${tool.color}60`,
+                                    }}
+                                >
+                                    {tool.iconUrl ? (
+                                        <img 
+                                            src={tool.iconUrl} 
+                                            alt={tool.name}
+                                            className="w-8 h-8 object-cover rounded"
+                                        />
+                                    ) : (
+                                        <span className="text-2xl">{tool.icon}</span>
+                                    )}
+                                    <span className="font-semibold text-gray-800 dark:text-gray-200">
+                                        {tool.name}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center py-12">
+                            <div className="text-6xl mb-4">🛠️</div>
+                            <h3 className="text-2xl font-semibold text-gray-700 dark:text-gray-300 mb-4">
+                                Tools Arsenal Coming Soon
+                            </h3>
+                            <p className="text-gray-600 dark:text-gray-400">
+                                Curating the finest tools for digital craftsmanship
+                            </p>
+                        </div>
+                    )}
+                </div>
+            </section>
+
+            {/* 4. MAGICAL PROJECTS SECTION - Priority Section */}
+            <section id="magical-projects" className="py-20 bg-gray-50 dark:bg-gray-900">
+                <div className="max-w-6xl mx-auto px-4">
+                    <h2 className="ghibli-font text-4xl text-center mb-4 text-blue-700 dark:text-blue-300">
                         <span className="border-b-4 border-yellow-400 pb-2">Magical Projects</span>
                     </h2>
+                    <p className="text-center text-gray-600 dark:text-gray-400 mb-12 text-lg">
+                        Enchanted case studies that showcase the magic of product management
+                    </p>
                     
                     {/* Sort and Filter Controls */}
                     <div className="flex flex-col md:flex-row gap-4 justify-center items-center mb-12">
@@ -333,18 +746,18 @@ const HomePage: React.FC<HomePageProps> = ({ navigateTo }) => {
                 </div>
             </section>
 
-            {/* My Journey Section */}
-            <section id="journey" className="py-20 bg-white dark:bg-gray-800">
+            {/* 5. MY JOURNEY SECTION - Priority Section */}
+            <section id="my-journey" className="py-20 bg-white dark:bg-gray-800">
                 <div className="max-w-4xl mx-auto px-4">
-                    {myJourney ? (
-                        <>
-                            <h2 className="ghibli-font text-4xl text-center mb-4 text-blue-700 dark:text-blue-300">
-                                <span className="border-b-4 border-yellow-400 pb-2">{myJourney.title}</span>
-                            </h2>
-                            <p className="text-center text-gray-600 dark:text-gray-400 mb-16 text-lg">
-                                {myJourney.subtitle}
-                            </p>
+                    <h2 className="ghibli-font text-4xl text-center mb-4 text-blue-700 dark:text-blue-300">
+                        <span className="border-b-4 border-yellow-400 pb-2">My Journey</span>
+                    </h2>
+                    <p className="text-center text-gray-600 dark:text-gray-400 mb-16 text-lg">
+                        The magical path that led me to where I am today
+                    </p>
 
+                    {myJourney && myJourney.items && myJourney.items.length > 0 ? (
+                        <>
                             <div className="relative">
                                 {/* Timeline line */}
                                 <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-yellow-400"></div>
@@ -389,63 +802,80 @@ const HomePage: React.FC<HomePageProps> = ({ navigateTo }) => {
                         </>
                     ) : (
                         <div className="text-center py-12">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-                            <p className="text-gray-600 dark:text-gray-400">Loading journey...</p>
+                            <div className="text-6xl mb-4">🗺️</div>
+                            <h3 className="text-2xl font-semibold text-gray-700 dark:text-gray-300 mb-4">
+                                Journey Map Coming Soon
+                            </h3>
+                            <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+                                Every great adventure has milestones. I'm charting the key moments 
+                                that shaped my path in product management and beyond.
+                            </p>
                         </div>
                     )}
                 </div>
             </section>
 
-            {/* Carousel Section */}
-            <section id="magical-scenery" className="py-20 bg-white dark:bg-gray-800">
+            {/* 6. MAGICAL JOURNEYS SECTION - Priority Section */}
+            <section id="magical-journeys" className="py-20 bg-gray-50 dark:bg-gray-900">
                 <div className="max-w-6xl mx-auto px-4">
-                    <h2 className="ghibli-font text-4xl text-center mb-16 text-blue-700 dark:text-blue-300">
+                    <h2 className="ghibli-font text-4xl text-center mb-4 text-blue-700 dark:text-blue-300">
                         <span className="border-b-4 border-yellow-400 pb-2">Magical Journeys</span>
                     </h2>
+                    <p className="text-center text-gray-600 dark:text-gray-400 mb-16 text-lg">
+                        Visual stories and moments that capture the essence of my adventures
+                    </p>
                     <Carousel />
                 </div>
             </section>
 
-            {/* CV Section */}
-            <section id="cv" className="py-20 bg-white dark:bg-gray-800">
+            {/* 7. DOWNLOAD CV SECTION - Priority Section */}
+            <section id="download-cv" className="py-20 bg-white dark:bg-gray-800">
                 <div className="max-w-6xl mx-auto px-4">
-                    {cvSection ? (
-                        <>
-                            <h2 className="ghibli-font text-4xl text-center mb-4 text-blue-700 dark:text-blue-300">
-                                <span className="border-b-4 border-yellow-400 pb-2">{cvSection.title}</span>
-                            </h2>
-                            <p className="text-center text-gray-600 dark:text-gray-400 mb-4 text-lg">
-                                {cvSection.subtitle}
-                            </p>
-                            <p className="text-center text-gray-600 dark:text-gray-400 mb-16">
-                                {cvSection.description}
-                            </p>
+                    <h2 className="ghibli-font text-4xl text-center mb-4 text-blue-700 dark:text-blue-300">
+                        <span className="border-b-4 border-yellow-400 pb-2">Download CV</span>
+                    </h2>
+                    <p className="text-center text-gray-600 dark:text-gray-400 mb-16 text-lg">
+                        Get my professional resume in your preferred format
+                    </p>
 
-                            {/* CV Version Cards */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                                {cvSection.versions.filter(version => version.isActive).map((version) => (
-                                    <CVVersionCard key={version.id} version={version} />
-                                ))}
-                            </div>
-                        </>
+                    {cvSection && cvSection.versions && cvSection.versions.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                            {cvSection.versions.filter(version => version.isActive).map((version) => (
+                                <CVVersionCard key={version.id} version={version} />
+                            ))}
+                        </div>
                     ) : (
                         <div className="text-center py-12">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-                            <p className="text-gray-600 dark:text-gray-400">Loading CV information...</p>
+                            <div className="text-6xl mb-4">📄</div>
+                            <h3 className="text-2xl font-semibold text-gray-700 dark:text-gray-300 mb-4">
+                                CV Downloads Coming Soon
+                            </h3>
+                            <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+                                I'm preparing multiple versions of my CV tailored for different regions 
+                                and opportunities. Check back soon for download options.
+                            </p>
+                            <div className="mt-8">
+                                <button className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-lg">
+                                    📧 Request CV via Email
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>
             </section>
 
-            {/* Contact Section */}
-            <section id="contact" className="py-20 bg-gray-50 dark:bg-gray-900">
+            {/* 8. CONTACT ME SECTION - Priority Section */}
+            <section id="contact-me" className="py-20 bg-gray-50 dark:bg-gray-900">
                 <div className="max-w-4xl mx-auto px-4">
+                    <h2 className="ghibli-font text-4xl text-center mb-4 text-blue-700 dark:text-blue-300">
+                        <span className="border-b-4 border-yellow-400 pb-2">Contact Me</span>
+                    </h2>
+                    <p className="text-center text-gray-600 dark:text-gray-400 mb-16 text-lg">
+                        Let's create something magical together
+                    </p>
+
                     {contactSection ? (
                         <>
-                            <h2 className="ghibli-font text-4xl text-center mb-16 text-blue-700 dark:text-blue-300">
-                                <span className="border-b-4 border-yellow-400 pb-2">{contactSection.title}</span>
-                            </h2>
-
                             {/* Main Contact Card */}
                             <div className="bg-gradient-to-br from-blue-600 to-purple-700 text-white rounded-3xl p-8 mb-8 shadow-2xl">
                                 <h3 className="ghibli-font text-2xl mb-4">{contactSection.subtitle}</h3>

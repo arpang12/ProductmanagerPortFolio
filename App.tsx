@@ -1,9 +1,13 @@
 
 import React, { useState, useEffect, useCallback, createContext } from 'react';
-import { AuthContextType, CaseStudy, User, View } from './types';
+import { AuthContextType, CaseStudy, BlogPost, User, View } from './types';
 import { api } from './services/api';
 import HomePage from './pages/HomePage';
 import CaseStudyPage from './pages/CaseStudyPage';
+import BlogListPage from './pages/BlogListPage';
+import BlogPostPage from './pages/BlogPostPage';
+import PublicPortfolioPage from './pages/PublicPortfolioPage';
+import { PublicPortfolioSnapshotPage } from './pages/PublicPortfolioSnapshotPage';
 import AdminPage from './pages/AdminPage';
 import LoginPage from './pages/LoginPage';
 import DevelopmentBanner from './components/DevelopmentBanner';
@@ -14,8 +18,20 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 const App: React.FC = () => {
     const [view, setView] = useState<View>('home');
     const [selectedCaseStudy, setSelectedCaseStudy] = useState<CaseStudy | null>(null);
+    const [selectedBlogPost, setSelectedBlogPost] = useState<BlogPost | null>(null);
+    const [publicUsername, setPublicUsername] = useState<string | null>(null);
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
+
+    // Check if URL is a public portfolio route (/u/username)
+    useEffect(() => {
+        const path = window.location.pathname;
+        const match = path.match(/^\/u\/([a-z0-9_-]+)/i);
+        if (match) {
+            setPublicUsername(match[1]);
+            setView('home'); // Use home view for public portfolio
+        }
+    }, []);
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -45,18 +61,34 @@ const App: React.FC = () => {
         setView('home');
     };
 
-    const navigateTo = useCallback(async (newView: View, caseStudyId?: string) => {
-        if (newView === 'caseStudy' && caseStudyId) {
+    const navigateTo = useCallback(async (newView: View, idOrSlug?: string) => {
+        if (newView === 'caseStudy' && idOrSlug) {
             try {
-                const caseStudyData = await api.getCaseStudyById(caseStudyId);
+                const caseStudyData = await api.getCaseStudyById(idOrSlug);
                 setSelectedCaseStudy(caseStudyData);
+                setSelectedBlogPost(null);
                 setView('caseStudy');
             } catch (error) {
                 console.error("Failed to load case study:", error);
-                setView('home'); // Fallback to home if case study not found
+                setView('home');
+            }
+        } else if (newView === 'blogPost' && idOrSlug) {
+            try {
+                const blogPostData = await api.getBlogPostBySlug(idOrSlug);
+                if (blogPostData) {
+                    setSelectedBlogPost(blogPostData);
+                    setSelectedCaseStudy(null);
+                    setView('blogPost');
+                } else {
+                    setView('blog');
+                }
+            } catch (error) {
+                console.error("Failed to load blog post:", error);
+                setView('blog');
             }
         } else {
             setSelectedCaseStudy(null);
+            setSelectedBlogPost(null);
             setView(newView);
         }
         window.scrollTo(0, 0);
@@ -109,11 +141,23 @@ const App: React.FC = () => {
              return <LoginPage navigateTo={navigateTo} />;
         }
 
+        // If viewing a public portfolio by username
+        if (publicUsername) {
+            if (view === 'caseStudy' && selectedCaseStudy) {
+                return <CaseStudyPage caseStudy={selectedCaseStudy} navigateTo={navigateTo} />;
+            }
+            return <PublicPortfolioSnapshotPage />;
+        }
+
         switch (view) {
             case 'home':
                 return <HomePage navigateTo={navigateTo} />;
             case 'caseStudy':
                 return selectedCaseStudy ? <CaseStudyPage caseStudy={selectedCaseStudy} navigateTo={navigateTo} /> : <HomePage navigateTo={navigateTo} />;
+            case 'blog':
+                return <BlogListPage navigateTo={navigateTo} isAuthenticated={!!user} />;
+            case 'blogPost':
+                return selectedBlogPost ? <BlogPostPage post={selectedBlogPost} navigateTo={navigateTo} isAuthenticated={!!user} /> : <BlogListPage navigateTo={navigateTo} isAuthenticated={!!user} />;
             case 'admin':
                 return <AdminPage navigateTo={navigateTo} />;
             case 'login':

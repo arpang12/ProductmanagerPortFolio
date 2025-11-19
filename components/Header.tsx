@@ -47,6 +47,7 @@ const Header: React.FC<HeaderProps> = ({ navigateTo, isTransparent = false }) =>
                     <div className="hidden md:flex items-center space-x-8">
                         <a href="#about" onClick={(e) => { e.preventDefault(); handleNav('home'); setTimeout(() => document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' }), 100); }} className={linkClass}>About</a>
                         <a href="#projects" onClick={(e) => { e.preventDefault(); handleNav('home'); setTimeout(() => document.getElementById('projects')?.scrollIntoView({ behavior: 'smooth' }), 100); }} className={linkClass}>Projects</a>
+                        <button onClick={() => handleNav('blog')} className={linkClass}>Blog</button>
                         <a href="#cv" onClick={(e) => { e.preventDefault(); handleNav('home'); setTimeout(() => document.getElementById('cv')?.scrollIntoView({ behavior: 'smooth' }), 100); }} className={linkClass}>CV</a>
                         <a href="#contact" onClick={(e) => { e.preventDefault(); handleNav('home'); setTimeout(() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' }), 100); }} className={linkClass}>Contact</a>
                         {auth?.user && (
@@ -70,6 +71,7 @@ const Header: React.FC<HeaderProps> = ({ navigateTo, isTransparent = false }) =>
                  <div className="md:hidden bg-white dark:bg-gray-800 py-2 px-4 shadow-lg">
                     <a href="#about" onClick={(e) => { e.preventDefault(); handleNav('home'); setTimeout(() => document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' }), 100); }} className="block py-2 text-gray-800 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-300">About</a>
                     <a href="#projects" onClick={(e) => { e.preventDefault(); handleNav('home'); setTimeout(() => document.getElementById('projects')?.scrollIntoView({ behavior: 'smooth' }), 100); }} className="block py-2 text-gray-800 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-300">Projects</a>
+                    <button onClick={() => handleNav('blog')} className="block w-full text-left py-2 text-gray-800 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-300">Blog</button>
                     <a href="#cv" onClick={(e) => { e.preventDefault(); handleNav('home'); setTimeout(() => document.getElementById('cv')?.scrollIntoView({ behavior: 'smooth' }), 100); }} className="block py-2 text-gray-800 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-300">CV</a>
                     <a href="#contact" onClick={(e) => { e.preventDefault(); handleNav('home'); setTimeout(() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' }), 100); }} className="block py-2 text-gray-800 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-300">Contact</a>
                     {auth?.user && (

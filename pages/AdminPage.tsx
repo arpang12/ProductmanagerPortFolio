@@ -8,6 +8,9 @@ import MagicToolboxManager from '../components/MagicToolboxManager';
 import JourneyManager from '../components/JourneyManager';
 import ContactManager from '../components/ContactManager';
 import CVManager from '../components/CVManager';
+import ProfileSettingsManager from '../components/ProfileSettingsManager';
+import OptimizedPortfolioPublisher from '../components/OptimizedPortfolioPublisher';
+import PortfolioStatusIndicator from '../components/PortfolioStatusIndicator';
 import AIEnhancementModal from '../components/AIEnhancementModal';
 import DocumentManager from '../components/DocumentManager';
 import { api } from '../services/api';
@@ -176,10 +179,12 @@ const AdminPage: React.FC<AdminPageProps> = ({ navigateTo }) => {
     const [isCarouselManagerOpen, setCarouselManagerOpen] = useState(false);
     const [isMyStoryManagerOpen, setMyStoryManagerOpen] = useState(false);
     const [isAISettingsOpen, setAISettingsOpen] = useState(false);
+    const [isProfileSettingsOpen, setProfileSettingsOpen] = useState(false);
     const [isMagicToolboxOpen, setMagicToolboxOpen] = useState(false);
     const [isJourneyManagerOpen, setJourneyManagerOpen] = useState(false);
     const [isContactManagerOpen, setContactManagerOpen] = useState(false);
     const [isCVManagerOpen, setCVManagerOpen] = useState(false);
+    const [isPortfolioPublishOpen, setPortfolioPublishOpen] = useState(false);
 
     const auth = useContext(AuthContext);
 
@@ -233,7 +238,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ navigateTo }) => {
         try {
             // Fetch fresh data from database to ensure we have latest changes
             console.log('🔄 Fetching fresh case study data for:', caseStudy.id);
-            const freshCaseStudy = await api.getCaseStudyById(caseStudy.id);
+            const freshCaseStudy = await api.getCaseStudyById(caseStudy.id); // Admin can see unpublished
             setSelectedCaseStudy(freshCaseStudy);
             setView('editor');
         } catch (error) {
@@ -256,7 +261,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ navigateTo }) => {
             
             // Fetch fresh data from database to ensure editor has latest
             console.log('🔄 Fetching fresh data after save...');
-            const freshStudy = await api.getCaseStudyById(savedStudy.id);
+            const freshStudy = await api.getCaseStudyById(savedStudy.id); // Admin can see unpublished
             setSelectedCaseStudy(freshStudy);
             
             alert('Changes saved successfully!');
@@ -275,15 +280,18 @@ const AdminPage: React.FC<AdminPageProps> = ({ navigateTo }) => {
                     <h1 className="ghibli-font text-4xl text-blue-700 dark:text-blue-300 mb-2">Admin Dashboard</h1>
                     <p className="text-gray-600 dark:text-gray-400">Manage your magical portfolio content</p>
                 </div>
-                <button 
-                    onClick={() => setCreateModalOpen(true)} 
-                    className="bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 active:scale-95 flex items-center gap-2"
-                >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    Create New Case Study
-                </button>
+                <div className="flex items-center gap-4">
+                    <PortfolioStatusIndicator />
+                    <button 
+                        onClick={() => setCreateModalOpen(true)} 
+                        className="bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 active:scale-95 flex items-center gap-2"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Create New Case Study
+                    </button>
+                </div>
             </div>
 
             {/* Quick Actions */}
@@ -458,6 +466,54 @@ const AdminPage: React.FC<AdminPageProps> = ({ navigateTo }) => {
                     </div>
                 </div>
 
+                {/* Public Profile Settings - NEW! */}
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group border-2 border-green-200 dark:border-green-800">
+                    <div className="p-5">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-transform duration-200">
+                                <span className="text-xl">🌐</span>
+                            </div>
+                            <span className="text-xs bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400 px-2 py-1 rounded-full font-medium">
+                                NEW!
+                            </span>
+                        </div>
+                        <h3 className="font-bold text-gray-800 dark:text-gray-200 mb-1 text-base">Public Profile</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 leading-relaxed">
+                            Set your username and manage your public portfolio URL.
+                        </p>
+                        <button
+                            onClick={() => setProfileSettingsOpen(true)}
+                            className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2.5 px-4 rounded-lg transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] shadow-md hover:shadow-lg"
+                        >
+                            Manage Profile
+                        </button>
+                    </div>
+                </div>
+
+                {/* Portfolio Publish Manager - NEW! */}
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group border-2 border-blue-200 dark:border-blue-800">
+                    <div className="p-5">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-transform duration-200">
+                                <span className="text-xl">🚀</span>
+                            </div>
+                            <span className="text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400 px-2 py-1 rounded-full font-medium">
+                                PUBLISH
+                            </span>
+                        </div>
+                        <h3 className="font-bold text-gray-800 dark:text-gray-200 mb-1 text-base">Portfolio Publisher</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 leading-relaxed">
+                            Publish your portfolio to make it live and accessible to the public.
+                        </p>
+                        <button
+                            onClick={() => setPortfolioPublishOpen(true)}
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] shadow-md hover:shadow-lg"
+                        >
+                            Publish Portfolio
+                        </button>
+                    </div>
+                </div>
+
                 {/* AI Settings */}
                 <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group border border-gray-100 dark:border-gray-700">
                     <div className="p-5">
@@ -593,6 +649,52 @@ const AdminPage: React.FC<AdminPageProps> = ({ navigateTo }) => {
             {/* AI Settings Manager */}
             {isAISettingsOpen && (
                 <AISettingsManager onClose={() => setAISettingsOpen(false)} />
+            )}
+
+            {/* Profile Settings Manager */}
+            {isProfileSettingsOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+                        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+                            <div>
+                                <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">Public Profile Settings</h2>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Manage your username and portfolio visibility</p>
+                            </div>
+                            <button
+                                onClick={() => setProfileSettingsOpen(false)}
+                                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl"
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                            <ProfileSettingsManager />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Portfolio Publish Manager */}
+            {isPortfolioPublishOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+                        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+                            <div>
+                                <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">Portfolio Publisher</h2>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Publish your portfolio to make it live and accessible</p>
+                            </div>
+                            <button
+                                onClick={() => setPortfolioPublishOpen(false)}
+                                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl"
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                            <OptimizedPortfolioPublisher onClose={() => setPortfolioPublishOpen(false)} />
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* CV Manager */}

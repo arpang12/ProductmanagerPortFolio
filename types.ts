@@ -1,6 +1,6 @@
 // FIX: Removed incorrect import. CaseStudySection is defined in this file.
 
-export type View = 'home' | 'caseStudy' | 'admin' | 'login';
+export type View = 'home' | 'caseStudy' | 'admin' | 'login' | 'blog' | 'blogPost';
 
 export interface User {
   id: string;
@@ -254,6 +254,30 @@ export interface CVSection {
   subtitle: string;
   description: string;
   versions: CVVersion[];
+}
+
+// Blog Post types
+export interface BlogPost {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string;
+  content: string;
+  coverImageUrl?: string;
+  coverImageAssetId?: string;
+  author: string;
+  publishedAt: string;
+  updatedAt?: string;
+  tags: string[];
+  readTime?: number; // in minutes
+  isPublished: boolean;
+}
+
+export interface BlogCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
 }
 
 // Helper types derived from the main CaseStudy interface

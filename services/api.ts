@@ -1725,6 +1725,268 @@ export const api = {
         isActive: true
       }))
     }
+  },
+
+  // Public Data Access (No Authentication Required)
+  async getPublicPortfolioByUsername(username: string): Promise<{
+    profile: any;
+    caseStudies: CaseStudy[];
+    story: MyStorySection | null;
+    journey: MyJourney | null;
+    toolbox: MagicToolbox | null;
+    contact: ContactSection | null;
+    carousel: CarouselImage[];
+  }> {
+    // Get user profile by username (public data)
+    const { data: profile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('org_id, username, portfolio_status, name, bio, avatar_url')
+      .eq('username', username)
+      .eq('portfolio_status', 'published') // Only show published portfolios
+      .single();
+
+    if (profileError || !profile) {
+      throw new Error('Portfolio not found or not published');
+    }
+
+    // Get all public data in parallel
+    const [caseStudies, story, journey, toolbox, contact, carousel] = await Promise.all([
+      this.getPublicCaseStudies(profile.org_id),
+      this.getPublicMyStory(profile.org_id),
+      this.getPublicJourney(profile.org_id),
+      this.getPublicMagicToolbox(profile.org_id),
+      this.getPublicContactInfo(profile.org_id),
+      this.getPublicCarousel(profile.org_id)
+    ]);
+
+    return {
+      profile,
+      caseStudies,
+      story,
+      journey,
+      toolbox,
+      contact,
+      carousel
+    };
+  },
+
+  async getPublicCaseStudies(orgId: string): Promise<CaseStudy[]> {
+    const { data, error } = await supabase
+      .from('case_studies')
+      .select(`
+        *,
+        assets!case_studies_hero_image_asset_id_fkey (cloudinary_url),
+        case_study_sections (
+          *,
+          section_assets (
+            *,
+            assets (*)
+          ),
+          embed_widgets (*)
+        )
+      `)
+      .eq('org_id', orgId)
+      .eq('is_published', true)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return (data || []).map(transformCaseStudy);
+  },
+
+  async getPublicMyStory(orgId: string): Promise<MyStorySection | null> {
+    const { data, error } = await supabase
+      .from('story_sections')
+      .select(`
+        *,
+        story_paragraphs (*),
+        assets (*)
+      `)
+      .eq('org_id', orgId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return transformStorySection(data);
+  },
+
+  async getPublicJourney(orgId: string): Promise<MyJourney | null> {
+    // Journey tables don't exist yet, return null for now
+    // TODO: Implement when journey tables are created
+    console.log('Journey tables not available yet');
+    return null;
+  },
+
+  async getPublicMagicToolbox(orgId: string): Promise<MagicToolbox | null> {
+    try {
+      // Try to get skills and tools directly from their tables
+      const [skillsData, toolsData] = await Promise.all([
+        supabase
+          .from('skill_categories')
+          .select('*')
+          .eq('org_id', orgId),
+        supabase
+          .from('tools')
+          .select('*')
+          .eq('org_id', orgId)
+      ]);
+
+      if (skillsData.error && toolsData.error) return null;
+
+      return {
+        id: `toolbox-${orgId}`,
+        title: 'Skills & Tools',
+        subtitle: 'My Technical Expertise',
+        categories: skillsData.data?.map(transformSkillCategory) || [],
+        tools: toolsData.data?.map(transformTool) || []
+      };
+    } catch (error) {
+      console.log('Magic toolbox tables not fully available yet');
+      return null;
+    }
+  },
+
+  async getPublicContactInfo(orgId: string): Promise<ContactSection | null> {
+    const { data, error } = await supabase
+      .from('contact_sections')
+      .select(`
+        *,
+        social_links (*)
+      `)
+      .eq('org_id', orgId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return transformContactSection(data);
+  },
+
+  async getPublicCarousel(orgId: string): Promise<CarouselImage[]> {
+    const { data, error } = await supabase
+      .from('carousel_slides')
+      .select(`
+        *,
+        assets (*)
+      `)
+      .eq('org_id', orgId)
+      .eq('is_active', true)
+      .order('order_key');
+
+    if (error) return [];
+    return (data || []).map(transformCarouselSlide);
+  },
+
+  // Portfolio Publishing Methods (Authentication Required)
+  async getPortfolioStatus(): Promise<{
+    status: 'draft' | 'published';
+    lastPublished?: string;
+    version?: number;
+    publicUrl?: string;
+    username?: string;
+  }> {
+    if (isDevelopmentMode) {
+      return {
+        status: 'draft',
+        username: 'demo-user',
+        publicUrl: `${window.location.origin}/u/demo-user`
+      };
+    }
+
+    const orgId = await getUserOrgId();
+    if (!orgId) {
+      // For public access, try to get status without auth
+      return {
+        status: 'draft',
+        username: undefined,
+        publicUrl: undefined
+      };
+    }
+
+    // Get profile with portfolio status
+    const { data: profile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('portfolio_status, username')
+      .eq('org_id', orgId)
+      .single();
+
+    if (profileError) {
+      // Return default status if profile not found
+      return {
+        status: 'draft',
+        username: undefined,
+        publicUrl: undefined
+      };
+    }
+
+    return {
+      status: profile.portfolio_status || 'draft',
+      username: profile.username,
+      publicUrl: profile.username ? `${window.location.origin}/u/${profile.username}` : undefined
+    };
+  },
+
+  async publishPortfolio(): Promise<{ success: boolean; message: string; publicUrl?: string }> {
+    if (isDevelopmentMode) {
+      return {
+        success: true,
+        message: 'Portfolio published successfully (development mode)',
+        publicUrl: `${window.location.origin}/u/demo-user`
+      };
+    }
+
+    const orgId = await getUserOrgId();
+    if (!orgId) throw new Error('User not authenticated');
+
+    // Check if user has username
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('username')
+      .eq('org_id', orgId)
+      .single();
+
+    if (!profile?.username) {
+      throw new Error('Username required. Please set up your username in Profile Settings first.');
+    }
+
+    // Update portfolio status to published
+    const { error: updateError } = await supabase
+      .from('user_profiles')
+      .update({ portfolio_status: 'published' })
+      .eq('org_id', orgId);
+
+    if (updateError) throw updateError;
+
+    return {
+      success: true,
+      message: 'Portfolio published successfully!',
+      publicUrl: `${window.location.origin}/u/${profile.username}`
+    };
+  },
+
+  async unpublishPortfolio(): Promise<{ success: boolean; message: string }> {
+    if (isDevelopmentMode) {
+      return {
+        success: true,
+        message: 'Portfolio unpublished successfully (development mode)'
+      };
+    }
+
+    const orgId = await getUserOrgId();
+    if (!orgId) throw new Error('User not authenticated');
+
+    // Update portfolio status to draft
+    const { error: updateError } = await supabase
+      .from('user_profiles')
+      .update({ portfolio_status: 'draft' })
+      .eq('org_id', orgId);
+
+    if (updateError) throw updateError;
+
+    return {
+      success: true,
+      message: 'Portfolio unpublished successfully!'
+    };
   }
 }
 
