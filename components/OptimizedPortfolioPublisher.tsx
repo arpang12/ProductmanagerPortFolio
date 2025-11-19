@@ -53,14 +53,22 @@ const OptimizedPortfolioPublisher: React.FC<PortfolioPublisherProps> = ({ onClos
             const result = await api.publishPortfolio();
             
             if (result.success) {
-                setSuccess('Portfolio published successfully!');
+                setSuccess('Portfolio published successfully! Your public URL is ready.');
                 await loadStatus(); // Refresh status
             } else {
                 setError(result.message || 'Failed to publish portfolio');
             }
         } catch (error) {
             console.error('Error publishing portfolio:', error);
-            setError('Failed to publish portfolio');
+            
+            // Provide specific error messages based on the error
+            if (error.message?.includes('Username required')) {
+                setError('Please set up your username in Profile Settings before publishing.');
+            } else if (error.message?.includes('not authenticated')) {
+                setError('Please log in to publish your portfolio.');
+            } else {
+                setError(`Failed to publish portfolio: ${error.message}`);
+            }
         } finally {
             setPublishing(false);
         }
@@ -206,12 +214,23 @@ const OptimizedPortfolioPublisher: React.FC<PortfolioPublisherProps> = ({ onClos
             {/* Username Setup */}
             {!status?.username && (
                 <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                    <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-2">
-                        <strong>Setup Required:</strong> You need to set up your username first.
-                    </p>
-                    <p className="text-xs text-yellow-700 dark:text-yellow-300">
-                        Go to Profile Settings to set your username before publishing.
-                    </p>
+                    <div className="flex items-start gap-3">
+                        <span className="text-2xl">⚠️</span>
+                        <div>
+                            <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
+                                Username Required for Publishing
+                            </p>
+                            <p className="text-xs text-yellow-700 dark:text-yellow-300 mb-3">
+                                You need to set up your username before you can publish your portfolio. This will be your public URL.
+                            </p>
+                            <button
+                                onClick={() => window.location.href = '/admin#profile-settings'}
+                                className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white text-xs rounded-md transition-colors"
+                            >
+                                Go to Profile Settings
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
