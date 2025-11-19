@@ -1911,7 +1911,82 @@ export const api = {
       .single();
 
     if (profileError) {
-      // Return default status if profile not found
+      // If profile doesn't exist, create one (similar to getProfileSettings)
+      if (profileError.code === 'PGRST116') { // No rows returned
+        console.log('🔧 Creating initial profile for portfolio status...');
+        
+        // Get user info from auth
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          return {
+            status: 'draft',
+            username: undefined,
+            publicUrl: undefined
+          };
+        }
+
+        const defaultUsername = user.email?.split('@')[0]?.replace(/[^a-z0-9]/g, '') || `user${Date.now().toString().slice(-6)}`;
+        
+        const { data: newProfile, error: createError } = await supabase
+          .from('user_profiles')
+          .insert({
+            org_id: orgId,
+            name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+            email: user.email,
+            username: defaultUsername,
+            is_portfolio_public: true,
+            portfolio_status: 'draft'
+          })
+          .select('portfolio_status, username')
+          .single();
+
+        if (createError) {
+          // If username conflict, try with timestamp
+          if (createError.message.includes('duplicate') || createError.message.includes('unique')) {
+            const timestampUsername = defaultUsername + Date.now().toString().slice(-4);
+            const { data: retryProfile, error: retryError } = await supabase
+              .from('user_profiles')
+              .insert({
+                org_id: orgId,
+                name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+                email: user.email,
+                username: timestampUsername,
+                is_portfolio_public: true,
+                portfolio_status: 'draft'
+              })
+              .select('portfolio_status, username')
+              .single();
+
+            if (retryError) {
+              return {
+                status: 'draft',
+                username: undefined,
+                publicUrl: undefined
+              };
+            }
+            
+            return {
+              status: retryProfile.portfolio_status || 'draft',
+              username: retryProfile.username,
+              publicUrl: retryProfile.username ? `${window.location.origin}/u/${retryProfile.username}` : undefined
+            };
+          }
+          
+          return {
+            status: 'draft',
+            username: undefined,
+            publicUrl: undefined
+          };
+        }
+        
+        return {
+          status: newProfile.portfolio_status || 'draft',
+          username: newProfile.username,
+          publicUrl: newProfile.username ? `${window.location.origin}/u/${newProfile.username}` : undefined
+        };
+      }
+      
+      // Return default status for other errors
       return {
         status: 'draft',
         username: undefined,
