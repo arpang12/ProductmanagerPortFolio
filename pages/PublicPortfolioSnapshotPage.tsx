@@ -87,7 +87,7 @@ export const PublicPortfolioSnapshotPage: React.FC = () => {
     if (loading) {
         return (
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-                <Header />
+                <Header navigateTo={() => {}} />
                 <div className="flex items-center justify-center min-h-[60vh]">
                     <div className="text-center">
                         <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4"></div>
@@ -101,7 +101,7 @@ export const PublicPortfolioSnapshotPage: React.FC = () => {
     if (error) {
         return (
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-                <Header />
+                <Header navigateTo={() => {}} />
                 <div className="flex items-center justify-center min-h-[60vh]">
                     <div className="text-center max-w-md mx-auto px-4">
                         <div className="text-6xl mb-4">🔒</div>
@@ -129,7 +129,7 @@ export const PublicPortfolioSnapshotPage: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-            <Header />
+            <Header navigateTo={() => {}} />
             
             {/* Published Portfolio Badge */}
             <div className="bg-green-50 dark:bg-green-900/20 border-b border-green-200 dark:border-green-800">

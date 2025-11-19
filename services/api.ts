@@ -1987,6 +1987,154 @@ export const api = {
       success: true,
       message: 'Portfolio unpublished successfully!'
     };
+  },
+
+  // Blog Methods (for BlogListPage and App.tsx)
+  async getBlogPosts(): Promise<any[]> {
+    // Return empty array for now - blog feature can be implemented later
+    return [];
+  },
+
+  async getBlogPostBySlug(slug: string): Promise<any | null> {
+    // Return null for now - blog feature can be implemented later
+    return null;
+  },
+
+  // Profile Settings Methods (for ProfileSettingsManager)
+  async getProfileSettings(): Promise<any> {
+    const orgId = await getUserOrgId();
+    if (!orgId) throw new Error('User not authenticated');
+
+    const { data: profile, error } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('org_id', orgId)
+      .single();
+
+    if (error) throw error;
+    return profile;
+  },
+
+  async updateProfileSettings(settings: any): Promise<any> {
+    const orgId = await getUserOrgId();
+    if (!orgId) throw new Error('User not authenticated');
+
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .update(settings)
+      .eq('org_id', orgId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  // Public Methods (for HomePage)
+  async getPublicProjects(orgId?: string): Promise<Project[]> {
+    if (!orgId) {
+      // Get projects from any published portfolio
+      const { data, error } = await supabase
+        .from('case_studies')
+        .select(`
+          *,
+          case_study_sections!inner (
+            section_id,
+            section_type,
+            enabled,
+            content
+          )
+        `)
+        .eq('is_published', true)
+        .order('created_at', { ascending: false })
+        .limit(6);
+
+      if (error) return [];
+      
+      return (data || []).map(transformCaseStudy).map(cs => ({
+        id: cs.id,
+        title: cs.title,
+        description: extractDescription(JSON.stringify(cs.sections)),
+        imageUrl: cs.sections.hero?.imageUrl || `https://picsum.photos/seed/${cs.id}/400/300`,
+        tags: extractTags(JSON.stringify(cs.sections)),
+        caseStudyId: cs.id
+      }));
+    }
+
+    return this.getPublicCaseStudies(orgId).then(caseStudies => 
+      caseStudies.map(cs => ({
+        id: cs.id,
+        title: cs.title,
+        description: extractDescription(JSON.stringify(cs.sections)),
+        imageUrl: cs.sections.hero?.imageUrl || `https://picsum.photos/seed/${cs.id}/400/300`,
+        tags: extractTags(JSON.stringify(cs.sections)),
+        caseStudyId: cs.id
+      }))
+    );
+  },
+
+  async getFirstPublicPortfolio(): Promise<any | null> {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('portfolio_status', 'published')
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return data;
+  },
+
+  // Data Symmetry Methods (for useDataSymmetry hook)
+  async verifyDataSymmetry(): Promise<{
+    isSymmetric: boolean;
+    issues: string[];
+    adminData: any;
+    publicData: any;
+  }> {
+    const orgId = await getUserOrgId();
+    if (!orgId) {
+      return {
+        isSymmetric: false,
+        issues: ['User not authenticated'],
+        adminData: null,
+        publicData: null
+      };
+    }
+
+    // Get admin data (what admin sees)
+    const adminData = {
+      caseStudies: await this.getCaseStudies(),
+      story: await this.getMyStory(),
+      contact: await this.getContactInfo()
+    };
+
+    // Get public data (what visitors see)
+    const publicData = {
+      caseStudies: await this.getPublicCaseStudies(orgId),
+      story: await this.getPublicMyStory(orgId),
+      contact: await this.getPublicContactInfo(orgId)
+    };
+
+    const issues: string[] = [];
+    
+    // Compare case studies
+    if (adminData.caseStudies.length !== publicData.caseStudies.length) {
+      issues.push(`Case studies count mismatch: Admin(${adminData.caseStudies.length}) vs Public(${publicData.caseStudies.length})`);
+    }
+
+    return {
+      isSymmetric: issues.length === 0,
+      issues,
+      adminData,
+      publicData
+    };
+  },
+
+  async ensureDataSymmetry(): Promise<void> {
+    // This method can be implemented to fix data symmetry issues
+    // For now, it's a no-op
+    return;
   }
 }
 
