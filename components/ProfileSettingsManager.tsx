@@ -28,6 +28,12 @@ const ProfileSettingsManager: React.FC = () => {
             }
         } catch (error) {
             console.error('Error loading profile:', error);
+            console.error('Error details:', {
+                message: error.message,
+                code: error.code,
+                details: error.details,
+                hint: error.hint
+            });
             
             // Check if it's an authentication error
             if (error.message?.includes('not authenticated') || error.message?.includes('Auth session missing')) {
@@ -40,15 +46,23 @@ const ProfileSettingsManager: React.FC = () => {
                 setTimeout(() => {
                     window.location.href = '/admin';
                 }, 2000);
-            } else if (error.message?.includes('No rows returned')) {
-                // Profile doesn't exist, try to create one
+            } else {
+                // For any other error, show a generic message with retry option
                 setMessage({ 
                     type: 'error', 
-                    text: 'Setting up your profile for the first time...' 
+                    text: `Failed to load profile settings: ${error.message}. The system will try to create your profile automatically.` 
                 });
-                await createInitialProfile();
-            } else {
-                setMessage({ type: 'error', text: 'Failed to load profile settings' });
+                
+                // Try to create initial profile for any error (not just "No rows returned")
+                try {
+                    await createInitialProfile();
+                } catch (createError) {
+                    console.error('Failed to create initial profile:', createError);
+                    setMessage({ 
+                        type: 'error', 
+                        text: 'Unable to set up your profile. Please try refreshing the page or contact support.' 
+                    });
+                }
             }
         } finally {
             setLoading(false);
@@ -57,24 +71,38 @@ const ProfileSettingsManager: React.FC = () => {
 
     const createInitialProfile = async () => {
         try {
-            // Try to create a basic profile
+            console.log('🔧 Attempting to create initial profile...');
+            
+            // Try to create a basic profile using updateProfileSettings
+            // This will trigger the profile creation logic in the API
             const defaultUsername = `user${Date.now().toString().slice(-6)}`;
+            
+            setMessage({ 
+                type: 'error', 
+                text: 'Creating your profile, please wait...' 
+            });
+            
             await api.updateProfileSettings({
                 username: defaultUsername,
                 is_portfolio_public: true
             });
             
+            console.log('✅ Profile created successfully');
+            
             // Reload profile after creation
+            setLoading(true);
+            setMessage(null);
             await loadProfile();
+            
             setMessage({ 
                 type: 'success', 
-                text: 'Profile created! Please update your username and settings.' 
+                text: 'Profile created successfully! You can now update your username and settings.' 
             });
         } catch (error) {
             console.error('Error creating initial profile:', error);
             setMessage({ 
                 type: 'error', 
-                text: 'Failed to create profile. Please contact support.' 
+                text: `Failed to create profile: ${error.message}. Please try refreshing the page.` 
             });
         }
     };
