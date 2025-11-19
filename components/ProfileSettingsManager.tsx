@@ -14,17 +14,43 @@ const ProfileSettingsManager: React.FC = () => {
 
     useEffect(() => {
         loadProfile();
-    }, []);
+        
+        // Fallback timeout in case loading gets stuck
+        const timeout = setTimeout(() => {
+            if (loading) {
+                console.warn('Profile loading timeout - forcing completion');
+                setLoading(false);
+                setMessage({ 
+                    type: 'error', 
+                    text: 'Loading timed out. Please try refreshing the page.' 
+                });
+            }
+        }, 10000); // 10 second timeout
+
+        return () => clearTimeout(timeout);
+    }, [loading]);
 
     const loadProfile = async () => {
+        console.log('🔄 ProfileSettingsManager: Starting to load profile...');
         try {
+            console.log('📡 ProfileSettingsManager: Calling api.getProfileSettings()...');
             const profile = await api.getProfileSettings();
+            console.log('✅ ProfileSettingsManager: Profile loaded successfully:', profile);
+            
             if (profile) {
                 setUsername(profile.username || '');
                 setIsPublic(profile.is_portfolio_public ?? true);
                 setName(profile.name || '');
                 setEmail(profile.email || '');
                 updatePublicUrl(profile.username);
+                setMessage(null); // Clear any previous error messages
+                console.log('✅ ProfileSettingsManager: Profile state updated');
+            } else {
+                console.warn('⚠️ ProfileSettingsManager: Profile is null/undefined');
+                setMessage({ 
+                    type: 'error', 
+                    text: 'No profile data received. Please try refreshing the page.' 
+                });
             }
         } catch (error) {
             console.error('Error loading profile:', error);
