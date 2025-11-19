@@ -28,9 +28,54 @@ const ProfileSettingsManager: React.FC = () => {
             }
         } catch (error) {
             console.error('Error loading profile:', error);
-            setMessage({ type: 'error', text: 'Failed to load profile settings' });
+            
+            // Check if it's an authentication error
+            if (error.message?.includes('not authenticated') || error.message?.includes('Auth session missing')) {
+                setMessage({ 
+                    type: 'error', 
+                    text: 'Please log in to manage your profile settings. Redirecting to login...' 
+                });
+                
+                // Redirect to login after a short delay
+                setTimeout(() => {
+                    window.location.href = '/admin';
+                }, 2000);
+            } else if (error.message?.includes('No rows returned')) {
+                // Profile doesn't exist, try to create one
+                setMessage({ 
+                    type: 'error', 
+                    text: 'Setting up your profile for the first time...' 
+                });
+                await createInitialProfile();
+            } else {
+                setMessage({ type: 'error', text: 'Failed to load profile settings' });
+            }
         } finally {
             setLoading(false);
+        }
+    };
+
+    const createInitialProfile = async () => {
+        try {
+            // Try to create a basic profile
+            const defaultUsername = `user${Date.now().toString().slice(-6)}`;
+            await api.updateProfileSettings({
+                username: defaultUsername,
+                is_portfolio_public: true
+            });
+            
+            // Reload profile after creation
+            await loadProfile();
+            setMessage({ 
+                type: 'success', 
+                text: 'Profile created! Please update your username and settings.' 
+            });
+        } catch (error) {
+            console.error('Error creating initial profile:', error);
+            setMessage({ 
+                type: 'error', 
+                text: 'Failed to create profile. Please contact support.' 
+            });
         }
     };
 
@@ -94,11 +139,33 @@ const ProfileSettingsManager: React.FC = () => {
     if (loading) {
         return (
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8">
+                <div className="flex items-center justify-between mb-6">
+                    <div>
+                        <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-100">
+                            Public Profile Settings
+                        </h2>
+                        <p className="text-gray-600 dark:text-gray-400 mt-2">
+                            Manage your public portfolio URL and visibility
+                        </p>
+                    </div>
+                    <div className="text-4xl">🌐</div>
+                </div>
+                
                 <div className="animate-pulse">
                     <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-6"></div>
                     <div className="space-y-4">
                         <div className="h-12 bg-gray-200 dark:bg-gray-700 rounded"></div>
                         <div className="h-12 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                        <div className="h-12 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    </div>
+                </div>
+                
+                <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <div className="flex items-center gap-3">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                        <span className="text-blue-800 dark:text-blue-300">
+                            Loading your profile settings...
+                        </span>
                     </div>
                 </div>
             </div>

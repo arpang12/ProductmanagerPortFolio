@@ -2011,7 +2011,56 @@ export const api = {
       .eq('org_id', orgId)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      // If profile doesn't exist, create one
+      if (error.code === 'PGRST116') { // No rows returned
+        console.log('🔧 Creating initial profile for user...');
+        
+        // Get user info from auth
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        const defaultUsername = user.email?.split('@')[0]?.replace(/[^a-z0-9]/g, '') || `user${Date.now().toString().slice(-6)}`;
+        
+        const { data: newProfile, error: createError } = await supabase
+          .from('user_profiles')
+          .insert({
+            org_id: orgId,
+            name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+            email: user.email,
+            username: defaultUsername,
+            is_portfolio_public: true
+          })
+          .select()
+          .single();
+
+        if (createError) {
+          // If username conflict, try with timestamp
+          if (createError.message.includes('duplicate') || createError.message.includes('unique')) {
+            const timestampUsername = defaultUsername + Date.now().toString().slice(-4);
+            const { data: retryProfile, error: retryError } = await supabase
+              .from('user_profiles')
+              .insert({
+                org_id: orgId,
+                name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+                email: user.email,
+                username: timestampUsername,
+                is_portfolio_public: true
+              })
+              .select()
+              .single();
+
+            if (retryError) throw retryError;
+            return retryProfile;
+          }
+          throw createError;
+        }
+        
+        return newProfile;
+      }
+      throw error;
+    }
+    
     return profile;
   },
 
