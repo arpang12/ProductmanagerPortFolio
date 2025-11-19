@@ -45,23 +45,11 @@ async function getUserOrgId(): Promise<string | null> {
       return null
     }
     
-    const { data: profile, error } = await supabase
-      .from('user_profiles')
-      .select('org_id')
-      .eq('user_id', user.id)
-      .maybeSingle()
+    console.log('🔍 getUserOrgId: Authenticated user found:', user.id)
     
-    if (error) {
-      console.error('Error fetching user profile:', error)
-      return null
-    }
-    
-    if (!profile) {
-      console.warn('User profile not found for user:', user.id)
-      return null
-    }
-    
-    return profile.org_id
+    // For this system, the user.id IS the org_id
+    // No need to query user_profiles table to get org_id
+    return user.id
   } catch (error) {
     console.error('Error in getUserOrgId:', error)
     return null

@@ -80,13 +80,23 @@ const ProfileSettingsManager: React.FC = () => {
                 });
                 
                 // Try to create initial profile for any error (not just "No rows returned")
-                try {
-                    await createInitialProfile();
-                } catch (createError) {
-                    console.error('Failed to create initial profile:', createError);
+                // But prevent infinite loops by checking if we're already in a creation attempt
+                if (!error.message?.includes('row-level security policy') && 
+                    !error.message?.includes('Not Acceptable')) {
+                    try {
+                        await createInitialProfile();
+                    } catch (createError) {
+                        console.error('Failed to create initial profile:', createError);
+                        setMessage({ 
+                            type: 'error', 
+                            text: 'Unable to set up your profile. Please try refreshing the page or contact support.' 
+                        });
+                    }
+                } else {
+                    // RLS or authentication error - don't retry
                     setMessage({ 
                         type: 'error', 
-                        text: 'Unable to set up your profile. Please try refreshing the page or contact support.' 
+                        text: 'Authentication or permission error. Please log out and log back in, or contact support if the issue persists.' 
                     });
                 }
             }
