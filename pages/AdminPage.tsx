@@ -483,6 +483,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ navigateTo }) => {
                         </p>
                         <button
                             onClick={() => setProfileSettingsOpen(true)}
+                            data-profile-settings-btn
                             className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2.5 px-4 rounded-lg transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] shadow-md hover:shadow-lg"
                         >
                             Manage Profile
@@ -691,7 +692,13 @@ const AdminPage: React.FC<AdminPageProps> = ({ navigateTo }) => {
                             </button>
                         </div>
                         <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-                            <OptimizedPortfolioPublisher onClose={() => setPortfolioPublishOpen(false)} />
+                            <OptimizedPortfolioPublisher 
+                                onClose={() => setPortfolioPublishOpen(false)}
+                                onOpenProfileSettings={() => {
+                                    setPortfolioPublishOpen(false);
+                                    setProfileSettingsOpen(true);
+                                }}
+                            />
                         </div>
                     </div>
                 </div>

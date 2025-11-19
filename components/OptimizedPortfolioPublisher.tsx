@@ -3,6 +3,7 @@ import { api } from '../services/api';
 
 interface PortfolioPublisherProps {
     onClose?: () => void;
+    onOpenProfileSettings?: () => void;
 }
 
 interface PortfolioStatus {
@@ -13,7 +14,7 @@ interface PortfolioStatus {
     username?: string;
 }
 
-const OptimizedPortfolioPublisher: React.FC<PortfolioPublisherProps> = ({ onClose }) => {
+const OptimizedPortfolioPublisher: React.FC<PortfolioPublisherProps> = ({ onClose, onOpenProfileSettings }) => {
     const [status, setStatus] = useState<PortfolioStatus | null>(null);
     const [loading, setLoading] = useState(true);
     const [publishing, setPublishing] = useState(false);
@@ -224,7 +225,19 @@ const OptimizedPortfolioPublisher: React.FC<PortfolioPublisherProps> = ({ onClos
                                 You need to set up your username before you can publish your portfolio. This will be your public URL.
                             </p>
                             <button
-                                onClick={() => window.location.href = '/admin#profile-settings'}
+                                onClick={() => {
+                                    if (onOpenProfileSettings) {
+                                        onOpenProfileSettings();
+                                    } else {
+                                        // Fallback: try to find and click the profile settings button
+                                        const profileButton = document.querySelector('[data-profile-settings-btn]') as HTMLButtonElement;
+                                        if (profileButton) {
+                                            profileButton.click();
+                                        } else {
+                                            alert('Please close this dialog and click "Manage Profile" in the admin dashboard to set your username.');
+                                        }
+                                    }
+                                }}
                                 className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white text-xs rounded-md transition-colors"
                             >
                                 Go to Profile Settings
