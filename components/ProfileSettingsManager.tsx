@@ -79,24 +79,31 @@ const ProfileSettingsManager: React.FC = () => {
                     text: `Failed to load profile settings: ${error.message}. The system will try to create your profile automatically.` 
                 });
                 
-                // Try to create initial profile for any error (not just "No rows returned")
-                // But prevent infinite loops by checking if we're already in a creation attempt
-                if (!error.message?.includes('row-level security policy') && 
-                    !error.message?.includes('Not Acceptable')) {
+                // Handle specific error types
+                if (error.message?.includes('row-level security policy') || 
+                    error.message?.includes('Not Acceptable') ||
+                    error.code === 'PGRST301') {
+                    // RLS policy error - don't try to create profile
+                    setMessage({ 
+                        type: 'error', 
+                        text: 'Database permission error detected. Please apply the SQL fix in Supabase Dashboard to resolve this issue.' 
+                    });
+                } else if (error.code === 'PGRST116') {
+                    // No rows returned - profile doesn't exist, try to create it
                     try {
                         await createInitialProfile();
                     } catch (createError) {
                         console.error('Failed to create initial profile:', createError);
                         setMessage({ 
                             type: 'error', 
-                            text: 'Unable to set up your profile. Please try refreshing the page or contact support.' 
+                            text: 'Unable to set up your profile. Please apply the SQL fix in Supabase Dashboard.' 
                         });
                     }
                 } else {
-                    // RLS or authentication error - don't retry
+                    // Other errors - show generic message
                     setMessage({ 
                         type: 'error', 
-                        text: 'Authentication or permission error. Please log out and log back in, or contact support if the issue persists.' 
+                        text: 'Profile access error. Please apply the SQL fix in Supabase Dashboard or refresh the page.' 
                     });
                 }
             }
@@ -109,37 +116,57 @@ const ProfileSettingsManager: React.FC = () => {
         try {
             console.log('🔧 Attempting to create initial profile...');
             
-            // Try to create a basic profile using updateProfileSettings
-            // This will trigger the profile creation logic in the API
-            const defaultUsername = `user${Date.now().toString().slice(-6)}`;
-            
             setMessage({ 
                 type: 'error', 
                 text: 'Creating your profile, please wait...' 
             });
             
-            await api.updateProfileSettings({
-                username: defaultUsername,
-                is_portfolio_public: true
-            });
+            // Use getProfileSettings which has the profile creation logic
+            // This will automatically create the profile if it doesn't exist
+            const profile = await api.getProfileSettings();
             
-            console.log('✅ Profile created successfully');
-            
-            // Reload profile after creation
-            setLoading(true);
-            setMessage(null);
-            await loadProfile();
-            
-            setMessage({ 
-                type: 'success', 
-                text: 'Profile created successfully! You can now update your username and settings.' 
-            });
+            if (profile) {
+                console.log('✅ Profile created/retrieved successfully');
+                
+                // Update the component state with the new profile
+                setUsername(profile.username || '');
+                setIsPublic(profile.is_portfolio_public ?? true);
+                setName(profile.name || '');
+                setEmail(profile.email || '');
+                updatePublicUrl(profile.username);
+                
+                setMessage({ 
+                    type: 'success', 
+                    text: 'Profile created successfully! You can now update your username and settings.' 
+                });
+            } else {
+                throw new Error('Profile creation returned null');
+            }
         } catch (error) {
             console.error('Error creating initial profile:', error);
-            setMessage({ 
-                type: 'error', 
-                text: `Failed to create profile: ${error.message}. Please try refreshing the page.` 
-            });
+            
+            // Handle specific error types
+            if (error.message?.includes('duplicate key value violates unique constraint')) {
+                setMessage({ 
+                    type: 'error', 
+                    text: 'Profile already exists but cannot be accessed due to permission issues. Please apply the SQL fix in Supabase Dashboard.' 
+                });
+            } else if (error.message?.includes('Cannot coerce the result to a single JSON object')) {
+                setMessage({ 
+                    type: 'error', 
+                    text: 'Database access issue detected. Please apply the SQL fix in Supabase Dashboard.' 
+                });
+            } else if (error.message?.includes('row-level security policy')) {
+                setMessage({ 
+                    type: 'error', 
+                    text: 'Permission error detected. Please apply the RLS fix in Supabase Dashboard.' 
+                });
+            } else {
+                setMessage({ 
+                    type: 'error', 
+                    text: `Failed to create profile: ${error.message}. Please apply the SQL fix in Supabase Dashboard.` 
+                });
+            }
         }
     };
 

@@ -47,8 +47,30 @@ async function getUserOrgId(): Promise<string | null> {
     
     console.log('🔍 getUserOrgId: Authenticated user found:', user.id)
     
-    // For this system, the user.id IS the org_id
-    // No need to query user_profiles table to get org_id
+    // Ensure organization exists for this user
+    const { data: org, error: orgError } = await supabase
+      .from('organizations')
+      .select('org_id')
+      .eq('org_id', user.id)
+      .single();
+    
+    if (orgError && orgError.code === 'PGRST116') {
+      // Create organization if it doesn't exist
+      console.log('🔧 Creating organization for user...');
+      const { error: createOrgError } = await supabase
+        .from('organizations')
+        .insert({
+          org_id: user.id,
+          name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+          slug: `user-${user.id.slice(0, 8)}`
+        });
+      
+      if (createOrgError) {
+        console.error('Failed to create organization:', createOrgError);
+        // Continue anyway - the user.id is still valid as org_id
+      }
+    }
+    
     return user.id
   } catch (error) {
     console.error('Error in getUserOrgId:', error)
@@ -2088,7 +2110,8 @@ export const api = {
         const { data: newProfile, error: createError } = await supabase
           .from('user_profiles')
           .insert({
-            org_id: orgId,
+            user_id: user.id,  // ✅ Include user_id
+            org_id: orgId,     // ✅ Include org_id
             name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
             email: user.email,
             username: defaultUsername,
@@ -2104,7 +2127,8 @@ export const api = {
             const { data: retryProfile, error: retryError } = await supabase
               .from('user_profiles')
               .insert({
-                org_id: orgId,
+                user_id: user.id,  // ✅ Include user_id
+                org_id: orgId,     // ✅ Include org_id
                 name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
                 email: user.email,
                 username: timestampUsername,
